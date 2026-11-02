@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ballet Geometry — Still Image Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --deep:#f5f0e8; --mid:#ede8dc; --gold:#9a7020; --gold-d:#c8a96e;
+    --blue:#2060a0; --amber:#b08010; --text:#2c2820; --muted:#6b6560;
+  }
+  html,body { min-height:100vh; background:var(--deep); color:var(--text);
+    font-family:'EB Garamond',Georgia,serif; font-size:16px; line-height:1.6; }
+  header { padding:1.2rem 2rem 0.7rem; border-bottom:1px solid #d0c8b8;
+    display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:.5rem; }
+  header h1 { font-family:'Cormorant Garamond',serif; font-weight:300;
+    font-size:1.3rem; color:var(--gold); font-style:italic; }
+  header p  { font-size:.76rem; color:var(--muted); font-style:italic; }
+
+  .workspace { display:grid; grid-template-columns:1fr 300px; min-height:calc(100vh - 56px); }
+
+  /* ── image column ── */
+  .image-col { display:flex; flex-direction:column; padding:1.2rem; gap:.8rem; }
+
+  /* The wrap holds everything; the hit-div sits on top in edit mode */
+  .image-wrap {
+    position:relative; background:#0a0c10; border-radius:4px;
+    flex:1 1 auto; min-height:300px;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+
+  /* Drop zone — visible only before image load, pointer-events auto */
+  #dropZone {
+    position:absolute; inset:0; z-index:10;
+    display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:.7rem; cursor:pointer;
+  }
+  #dropZone.gone { display:none; }
+  #dropZone .icon { font-size:2.4rem; opacity:.22; }
+  #dropZone p { color:var(--muted); font-style:italic; font-size:.9rem; text-align:center; }
+  #dropZone .hint { font-size:.73rem; color:#3a3f4d; }
+
+  /* Canvas — base layer, pointer-events:none always; hit-div handles clicks */
+  #overlayCanvas { display:block; max-width:100%; max-height:72vh;
+    border-radius:3px; pointer-events:none; position:relative; z-index:1; }
+
+  /* Transparent hit-capture div — sits above canvas, only active in edit mode */
+  #hitDiv {
+    position:absolute; inset:0; z-index:5;
+    display:none; /* shown only in edit mode */
+    cursor:crosshair;
+  }
+
+  #fileInput { display:none; }
+
+  .btn-row { display:flex; gap:.5rem; flex-wrap:wrap; flex-shrink:0; }
+  .btn { padding:.4rem .9rem; background:transparent; border:1px solid var(--gold-d);
+    border-radius:3px; color:var(--gold); font-family:'EB Garamond',serif;
+    font-size:.83rem; cursor:pointer; font-style:italic; transition:background .2s; }
+  .btn:hover { background:rgba(200,169,110,.07); }
+  .btn:disabled { opacity:.3; cursor:default; }
+  .btn.sec { border-color:#d0c8b8; color:var(--muted); }
+  .btn.sec:hover { background:rgba(255,255,255,.03); }
+  .btn.acc { border-color:var(--amber); color:var(--amber); }
+  .btn.acc:hover { background:rgba(232,201,122,.07); }
+  .btn.on  { border-color:var(--amber); color:var(--amber);
+    background:rgba(232,201,122,.08); }
+
+  .edit-hint { display:none; font-size:.75rem; font-style:italic; color:var(--amber);
+    padding:.25rem .1rem; }
+
+  .status-bar { font-size:.75rem; color:var(--muted); font-style:italic;
+    min-height:1.1rem; flex-shrink:0; }
+
+  /* ── sidebar ── */
+  .sidebar { border-left:1px solid #d0c8b8; padding:1.3rem 1.3rem;
+    display:flex; flex-direction:column; gap:1.4rem; overflow-y:auto; }
+  .sidebar h2 { font-family:'Cormorant Garamond',serif; font-weight:400;
+    font-size:.69rem; letter-spacing:.13em; color:var(--muted);
+    text-transform:uppercase; margin-bottom:.6rem; }
+
+  .vp-box { background:var(--mid); border:1px solid #d0c8b8; border-radius:3px;
+    padding:.75rem; text-align:center; }
+  .vp-eq { font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1.35rem; color:var(--muted); transition:color .3s; margin-bottom:.2rem; }
+  .vp-eq.proj { color:var(--amber); }
+  .vp-st { font-size:.74rem; color:var(--muted); font-style:italic; transition:color .3s; }
+  .vp-st.proj { color:var(--amber); }
+  .vp-bar { height:1px; background:#d0c8b8; margin-top:.55rem; border-radius:1px; overflow:hidden; }
+  .vp-fill { height:100%; background:linear-gradient(90deg,var(--gold),var(--amber));
+    border-radius:1px; transition:width .3s; box-shadow:0 0 5px rgba(232,201,122,.5); }
+
+  .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
+  .stat-box { background:var(--mid); border:1px solid #d0c8b8; border-radius:3px;
+    padding:.55rem .65rem; }
+  .stat-label { font-size:.64rem; color:var(--muted); letter-spacing:.04em;
+    text-transform:uppercase; margin-bottom:.1rem; }
+  .stat-val { font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1.1rem; color:var(--gold); }
+  .stat-unit { font-size:.68rem; color:var(--muted); }
+
+  .ctrl-row { display:flex; flex-direction:column; gap:.35rem; margin-bottom:.65rem; }
+  .ctrl-label { display:flex; justify-content:space-between; font-size:.8rem; }
+  .ctrl-label span:last-child { color:var(--gold); font-style:italic; }
+  input[type=range].sl {
+    -webkit-appearance:none; appearance:none; width:100%;
+    height:1px; background:#d0c8b8; outline:none; cursor:pointer; }
+  input[type=range].sl::-webkit-slider-thumb {
+    -webkit-appearance:none; width:12px; height:12px; border-radius:50%;
+    background:var(--gold); box-shadow:0 0 5px rgba(200,169,110,.4); }
+  input[type=range].sl.am::-webkit-slider-thumb { background:var(--amber); }
+  input[type=range].sl.bl::-webkit-slider-thumb { background:var(--blue); }
+
+  .tog-group { display:flex; flex-direction:column; gap:.45rem; }
+  .tog { display:flex; align-items:center; gap:.55rem; cursor:pointer;
+    font-size:.82rem; color:var(--text); user-select:none; }
+  .tog input { display:none; }
+  .tog-track { width:25px; height:13px; border-radius:7px; background:#d0c8b8;
+    position:relative; flex-shrink:0; transition:background .2s; }
+  .tog-track::after { content:''; position:absolute; top:2px; left:2px;
+    width:9px; height:9px; border-radius:50%; background:var(--muted);
+    transition:transform .2s, background .2s; }
+  .tog input:checked + .tog-track { background:rgba(200,169,110,.15); }
+  .tog input:checked + .tog-track::after { transform:translateX(12px); background:var(--gold); }
+  .sw { width:16px; height:2px; border-radius:1px; display:inline-block; margin-left:auto; }
+
+  .hidden-list { display:flex; flex-direction:column; gap:.28rem;
+    min-height:1.2rem; max-height:130px; overflow-y:auto; }
+  .hidden-item { display:flex; justify-content:space-between; align-items:center;
+    font-size:.73rem; color:#6a6560; }
+  .hidden-item span.restore { cursor:pointer; color:var(--gold);
+    padding-left:.4rem; flex-shrink:0; }
+  .hidden-item span.restore:hover { color:var(--amber); }
+  .note { font-size:.74rem; color:var(--muted); font-style:italic; line-height:1.65; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ballet Geometry — Still Image</h1>
+  <p>projective configurations latent in the dancing body</p>
+</header>
+
+<div class="workspace">
+<div class="image-col">
+
+  <div class="image-wrap" id="imageWrap">
+    <!-- Drop zone — removed from DOM after image load -->
+    <div id="dropZone">
+      <div class="icon">⬡</div>
+      <p>Drop an image here<br>or click to choose</p>
+      <p class="hint">JPG · PNG · WEBP</p>
+      <button id="chooseBtn" style="margin-top:.7rem;padding:.45rem 1.2rem;
+        background:transparent;border:1px solid #7a6540;border-radius:3px;
+        color:#c8a96e;font-family:EB Garamond,serif;font-size:.88rem;
+        font-style:italic;cursor:pointer;">Choose image</button>
+    </div>
+
+    <!-- Canvas — pointer-events:none; hitDiv handles interaction -->
+    <canvas id="overlayCanvas"></canvas>
+
+    <!-- Transparent hit-capture layer — only active in edit mode -->
+    <div id="hitDiv"></div>
+  </div>
+
+  <div class="btn-row" id="actionRow" style="display:none">
+    <button class="btn" id="analyzeBtn">Analyze pose</button>
+    <button class="btn acc" id="saveBtn">Save image</button>
+    <button class="btn sec" id="editBtn">Edit lines</button>
+    <button class="btn sec" id="restoreBtn">Restore all</button>
+    <button class="btn sec" id="clearBtn">Clear overlay</button>
+    <button class="btn sec" id="newBtn">New image</button>
+  </div>
+  <div class="edit-hint" id="editHint">
+    ✎ &nbsp;Hover to highlight · click to hide · click again to restore · Esc to exit
+  </div>
+  <div class="status-bar" id="statusBar">Load an image to begin.</div>
+
+</div><!-- .image-col -->
+
+<div class="sidebar">
+
+  <div>
+    <h2>Projective State</h2>
+    <div class="vp-box">
+      <div class="vp-eq" id="vpEq">—</div>
+      <div class="vp-st" id="vpSt">no image loaded</div>
+      <div class="vp-bar"><div class="vp-fill" id="vpFill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div>
+    <h2>Measurements</h2>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-label">Left arm</div>
+        <div class="stat-val" id="sLA">—<span class="stat-unit">°</span></div></div>
+      <div class="stat-box"><div class="stat-label">Right arm</div>
+        <div class="stat-val" id="sRA">—<span class="stat-unit">°</span></div></div>
+      <div class="stat-box"><div class="stat-label">Deviation</div>
+        <div class="stat-val" id="sDev">—<span class="stat-unit">°</span></div></div>
+      <div class="stat-box"><div class="stat-label">VP distance</div>
+        <div class="stat-val" id="sVP">—</div></div>
+      <div class="stat-box"><div class="stat-label">Left leg</div>
+        <div class="stat-val" id="sLL">—<span class="stat-unit">°</span></div></div>
+      <div class="stat-box"><div class="stat-label">Right leg</div>
+        <div class="stat-val" id="sRL">—<span class="stat-unit">°</span></div></div>
+    </div>
+  </div>
+
+  <div>
+    <h2>Display</h2>
+    <div class="ctrl-row">
+      <div class="ctrl-label"><span>Line thickness</span><span id="scaleVal">1.0×</span></div>
+      <input type="range" class="sl" id="scaleSlider" min="0.3" max="3.0" step="0.1" value="1.0">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label"><span>Parallel threshold</span><span id="threshVal">8°</span></div>
+      <input type="range" class="sl am" id="threshSlider" min="2" max="20" value="8">
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-label"><span>Image opacity</span><span id="opacVal">90%</span></div>
+      <input type="range" class="sl bl" id="opacSlider" min="20" max="100" value="90">
+    </div>
+  </div>
+
+  <div>
+    <h2>Layers</h2>
+    <div class="tog-group">
+      <label class="tog"><input type="checkbox" id="showSkeleton" checked>
+        <span class="tog-track"></span>Skeleton
+        <span class="sw" style="background:rgba(200,169,110,.7)"></span></label>
+      <label class="tog"><input type="checkbox" id="showArmLines" checked>
+        <span class="tog-track"></span>Arm lines extended
+        <span class="sw" style="background:#c8a96e"></span></label>
+      <label class="tog"><input type="checkbox" id="showLegLines" checked>
+        <span class="tog-track"></span>Leg lines extended
+        <span class="sw" style="background:#6ea8c8"></span></label>
+      <label class="tog"><input type="checkbox" id="showVP" checked>
+        <span class="tog-track"></span>Vanishing point
+        <span class="sw" style="background:#e8c97a"></span></label>
+      <label class="tog"><input type="checkbox" id="showHorizon" checked>
+        <span class="tog-track"></span>Horizon / line at ∞
+        <span class="sw" style="background:rgba(232,201,122,.4)"></span></label>
+      <label class="tog"><input type="checkbox" id="showAngles" checked>
+        <span class="tog-track"></span>Angle labels
+        <span class="sw" style="background:rgba(200,169,110,.5)"></span></label>
+      <label class="tog"><input type="checkbox" id="showHarmonic" checked>
+        <span class="tog-track"></span>Harmonic pencil (CR=1)
+        <span class="sw" style="background:rgba(160,120,200,.7)"></span></label>
+    </div>
+  </div>
+
+  <div>
+    <h2>Hidden Lines</h2>
+    <div class="hidden-list" id="hiddenList">
+      <span style="font-size:.73rem;color:#3a3f4d;font-style:italic;">None hidden.</span>
+    </div>
+  </div>
+
+  <div><p class="note">
+    Arm lines: shoulder→wrist extended.<br>
+    Vanishing point: intersection of arm lines.<br>
+    Use <em>Edit lines</em> to hide extraneous elements.<br>
+    <em>Save image</em> exports the annotated PNG.
+  </p></div>
+
+</div><!-- .sidebar -->
+</div><!-- .workspace -->
+
+<input type="file" id="fileInput" accept="image/*">
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+const S = {
+  loaded: false, landmarks: null,
+  W: 1, H: 1,          // canvas (= image) pixel dimensions
+  scale: 1.0,
+  threshold: 8,
+  opacity: 0.9,
+  showSkeleton: true, showArmLines: true, showLegLines: true,
+  showVP: true, showHorizon: true, showAngles: true,
+  editMode: false,
+  hidden: new Set(),   // set of element ids
+  hovered: null,
+};
+
+// ── DOM ───────────────────────────────────────────────────────────────────
+const canvas    = document.getElementById('overlayCanvas');
+const ctx       = canvas.getContext('2d');
+const hitDiv    = document.getElementById('hitDiv');
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const actionRow = document.getElementById('actionRow');
+const editHint  = document.getElementById('editHint');
+const statusBar = document.getElementById('statusBar');
+const img       = new Image();
+
+function status(t) { statusBar.textContent = t; }
+
+// ── MediaPipe ─────────────────────────────────────────────────────────────
+const pose = new Pose({ locateFile: f =>
+  `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+pose.setOptions({ modelComplexity:2, smoothLandmarks:false,
+  minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
+pose.onResults(r => {
+  S.landmarks = r.poseLandmarks || null;
+  status(S.landmarks
+    ? `Pose detected — ${S.landmarks.length} landmarks.`
+    : 'No pose detected — try a clearer image.');
+  draw();
+  document.getElementById('analyzeBtn').disabled = false;
+});
+
+// ── Geometry ──────────────────────────────────────────────────────────────
+const lm = i => ({
+  x: S.landmarks[i].x * S.W,
+  y: S.landmarks[i].y * S.H,
+  v: S.landmarks[i].visibility,
+});
+const angle  = (a,b) => Math.atan2(b.y-a.y, b.x-a.x) * 180/Math.PI;
+const lineTh = (a,b) => ({ A:b.y-a.y, B:a.x-b.x, C:b.x*a.y-a.x*b.y });
+function intersect(l1,l2) {
+  const d = l1.A*l2.B - l2.A*l1.B;
+  if (Math.abs(d)<1e-9) return null;
+  return { x:(l1.B*l2.C-l2.B*l1.C)/(-d), y:(l2.A*l1.C-l1.A*l2.C)/(-d) };
+}
+function extend(a,b,f=6) {
+  const dx=b.x-a.x, dy=b.y-a.y;
+  return { x1:a.x-dx*f, y1:a.y-dy*f, x2:b.x+dx*f, y2:b.y+dy*f };
+}
+function ndist(p) {
+  return Math.min(10, Math.sqrt(((p.x-S.W/2)/S.W)**2 + ((p.y-S.H/2)/S.H)**2));
+}
+
+// ── Line registry (rebuilt each draw) ────────────────────────────────────
+let reg = [];  // [{id, label, type:'line'|'dot', pts, lw}]
+
+function regLine(id, label, x1,y1,x2,y2, lw) {
+  reg.push({id, label, type:'line', pts:[x1,y1,x2,y2], lw});
+}
+function regDot(id, label, x,y, r) {
+  reg.push({id, label, type:'dot', pts:[x,y], lw:r});
+}
+
+function hitTest(mx, my, includeHidden=false) {
+  const s = S.scale;
+  let best=null, bestD=Infinity;
+  for (const el of reg) {
+    if (!includeHidden && S.hidden.has(el.id)) continue;
+    const tol = Math.max(20, el.lw * s * 3.5);
+    let d = Infinity;
+    if (el.type==='line') {
+      const [x1,y1,x2,y2] = el.pts;
+      const dx=x2-x1, dy=y2-y1, len2=dx*dx+dy*dy;
+      if (len2<1) continue;
+      const t = Math.max(0,Math.min(1,((mx-x1)*dx+(my-y1)*dy)/len2));
+      d = Math.hypot(mx-x1-t*dx, my-y1-t*dy);
+    } else {
+      d = Math.hypot(mx-el.pts[0], my-el.pts[1]);
+    }
+    if (d<tol && d<bestD) { bestD=d; best=el.id; }
+  }
+  return best;
+}
+
+// ── Draw helpers ──────────────────────────────────────────────────────────
+function outlinedLine(x1,y1,x2,y2, color, lw, ow, dash) {
+  const s=S.scale;
+  if (dash) ctx.setLineDash(dash.map(v=>v*s));
+  ctx.save(); ctx.strokeStyle='rgba(6,8,14,0.82)'; ctx.lineWidth=(lw+ow)*s;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=lw*s;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.restore();
+  if (dash) ctx.setLineDash([]);
+}
+function outlinedDot(x,y,r,fill) {
+  const s=S.scale, dr=r*s;
+  ctx.fillStyle='rgba(6,8,14,0.8)';
+  ctx.beginPath(); ctx.arc(x,y,dr+2.5*s,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=fill;
+  ctx.beginPath(); ctx.arc(x,y,dr,0,Math.PI*2); ctx.fill();
+}
+function angleLabel(x,y,text,color) {
+  if (!S.showAngles) return;
+  const s=S.scale, fs=Math.round(13*s);
+  ctx.font=`italic ${fs}px EB Garamond,serif`;
+  const tw=ctx.measureText(text).width, pad=5*s;
+  ctx.fillStyle='rgba(8,10,16,0.75)';
+  ctx.beginPath();
+  ctx.roundRect(x-tw/2-pad, y-10*s-pad, tw+pad*2, 18*s+pad, 3*s);
+  ctx.fill();
+  ctx.fillStyle=color; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text, x, y-s);
+}
+
+// ── Harmonic pencil mathematics ──────────────────────────────────────────
+// Cross ratio of four lines L1,L2,L3,L4 through a common point O:
+// CR(L1,L2;L3,L4) = sin(∠L1L3)·sin(∠L2L4) / sin(∠L1L4)·sin(∠L2L3)
+// A harmonic pencil has CR=1, meaning L3,L4 are the angle bisectors of L1,L2.
+
+// Line angle in radians from direction vector
+function lineAngleRad(p1, p2) {
+  return Math.atan2(p2.y - p1.y, p2.x - p1.x);
+}
+
+// Cross ratio of four lines through origin, given by their angles (radians)
+function crossRatioLines(a1, a2, a3, a4) {
+  const s13 = Math.sin(a1 - a3);
+  const s24 = Math.sin(a2 - a4);
+  const s14 = Math.sin(a1 - a4);
+  const s23 = Math.sin(a2 - a3);
+  if (Math.abs(s14 * s23) < 1e-10) return Infinity;
+  return (s13 * s24) / (s14 * s23);
+}
+
+// Harmonic conjugate angle: given L1(a1), L2(a2), L3(a3),
+// find a4 such that CR(a1,a2;a3,a4)=1
+function harmonicConjugateAngle(a1, a2, a3) {
+  // CR=1 ⟹ sin(a1-a3)sin(a2-a4) = sin(a1-a4)sin(a2-a3)
+  // Solving: tan(a4) = [sin(a1-a3)sin(a2) - sin(a2-a3)sin(a1)] /
+  //                    [sin(a1-a3)cos(a2) - sin(a2-a3)cos(a1)]
+  const s13 = Math.sin(a1 - a3), s23 = Math.sin(a2 - a3);
+  const num = s13 * Math.sin(a2) - s23 * Math.sin(a1);
+  const den = s13 * Math.cos(a2) - s23 * Math.cos(a1);
+  return Math.atan2(num, den);
+}
+
+// The two angle bisectors of lines at angles a1, a2
+function angleBisectors(a1, a2) {
+  const b1 = (a1 + a2) / 2;
+  const b2 = b1 + Math.PI / 2;
+  return [b1, b2];
+}
+
+// Line through point p0 at angle theta, extended to canvas edges
+function lineAtAngle(p0, theta, W, H, extend=6) {
+  const dx = Math.cos(theta), dy = Math.sin(theta);
+  return {
+    x1: p0.x - dx*W*extend, y1: p0.y - dy*W*extend,
+    x2: p0.x + dx*W*extend, y2: p0.y + dy*W*extend,
+  };
+}
+
+// Draw a harmonic pencil: four lines through p0, with color coding
+function drawHarmonicPencil(p0, angles, colors, labels, W, H) {
+  const sl = S.scale;
+  angles.forEach((theta, i) => {
+    const col   = colors[i] || 'rgba(160,120,200,0.6)';
+    const label = labels[i] || '';
+    const e     = lineAtAngle(p0, theta, W, H);
+
+    // Outline
+    ctx.save();
+    ctx.strokeStyle = 'rgba(8,10,16,0.75)';
+    ctx.lineWidth   = 2.5 * sl + 2 * sl;
+    ctx.setLineDash([10*sl, 8*sl]);
+    ctx.beginPath(); ctx.moveTo(e.x1,e.y1); ctx.lineTo(e.x2,e.y2);
+    ctx.stroke(); ctx.restore();
+
+    // Color
+    ctx.save();
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 2.5 * sl;
+    ctx.setLineDash([10*sl, 8*sl]);
+    ctx.beginPath(); ctx.moveTo(e.x1,e.y1); ctx.lineTo(e.x2,e.y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Label near the intersection point
+    if (label) {
+      const lx = p0.x + Math.cos(theta)*60*sl;
+      const ly = p0.y + Math.sin(theta)*60*sl;
+      ctx.fillStyle = col;
+      ctx.font = `italic ${Math.round(12*sl)}px Cormorant Garamond, serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, lx, ly);
+    }
+  });
+
+  // Mark the common point
+  ctx.fillStyle = 'rgba(8,10,16,0.8)';
+  ctx.beginPath(); ctx.arc(p0.x, p0.y, 6*sl+2, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(160,120,200,0.9)';
+  ctx.beginPath(); ctx.arc(p0.x, p0.y, 6*sl, 0, Math.PI*2); ctx.fill();
+}
+
+// Update the harmonic pencil HUD
+function updateCRDisplay(cr, config) {
+  const eq   = document.getElementById('crEq');
+  const desc = document.getElementById('crDesc');
+  const bar  = document.getElementById('crBar');
+  const note = document.getElementById('crNote');
+  if (!eq) return;
+
+  if (cr === null) {
+    eq.textContent   = 'CR = —';
+    eq.style.color   = 'var(--muted)';
+    desc.textContent = 'analyze a pose to see the cross ratio';
+    bar.style.width  = '0%';
+    return;
+  }
+
+  const crStr   = isFinite(cr) ? Math.abs(cr).toFixed(3) : '∞';
+  const isHarm  = isFinite(cr) && Math.abs(Math.abs(cr) - 1) < 0.08;
+  const isNear  = isFinite(cr) && Math.abs(Math.abs(cr) - 1) < 0.25;
+
+  eq.textContent = `CR = ${crStr}`;
+  eq.style.color = isHarm ? 'rgba(160,120,200,0.95)' : isNear ? 'var(--amber)' : 'var(--muted)';
+
+  // Proximity to 1
+  const prox = isFinite(cr) ? Math.max(0, 1 - Math.abs(Math.abs(cr)-1)/0.5) : 0;
+  bar.style.width = Math.round(prox*100)+'%';
+  bar.style.background = isHarm ? 'rgba(160,120,200,0.8)' : 'rgba(176,140,10,0.6)';
+
+  if (isHarm) {
+    desc.textContent = `Harmonic pencil! ${config}`;
+    desc.style.color = 'rgba(160,120,200,0.85)';
+    note.innerHTML = 'The four lines form a <em>harmonic pencil</em> with CR=1. '
+      + 'The arm lines and leg lines (or their bisectors) are in perfect projective balance. '
+      + '<br><br>The audience, looking along the perpendicular, is the fourth harmonic element — '
+      + 'the <em>point at infinity</em>.';
+  } else if (isNear) {
+    desc.textContent = `Near harmonic — deviation: ${Math.abs(Math.abs(cr)-1).toFixed(3)}`;
+    desc.style.color = 'var(--amber)';
+    note.innerHTML = 'Close to a harmonic pencil. '
+      + 'Adjust arm or leg positions to reach CR=1.';
+  } else {
+    desc.textContent = `Not harmonic — |CR−1| = ${Math.abs(Math.abs(cr)-1).toFixed(3)}`;
+    desc.style.color = 'var(--muted)';
+    note.innerHTML = 'The four lines are not in harmonic configuration. '
+      + "CR=1 occurs when the arm lines and leg lines are each other’s angle bisectors, "
+      + 'or when one pair of lines is parallel (VP at infinity).';
+  }
+}
+
+// ── Main draw ─────────────────────────────────────────────────────────────
+function draw() {
+  reg = [];
+  ctx.clearRect(0,0,S.W,S.H);
+  ctx.globalAlpha = S.opacity;
+  ctx.drawImage(img, 0,0,S.W,S.H);
+  ctx.globalAlpha = 1;
+
+  if (!S.landmarks) return;
+
+  const MV=0.35, s=S.scale;
+  const lS=lm(11),rS=lm(12),lE=lm(13),rE=lm(14),lW=lm(15),rW=lm(16);
+  const lH=lm(23),rH=lm(24),lK=lm(25),rK=lm(26),lA=lm(27),rA=lm(28);
+  const armsOK=[lS,lW,rS,rW].every(p=>p.v>MV);
+  const legsOK=[lH,lA,rH,rA].every(p=>p.v>MV);
+
+  let armDev=null,vpPt=null,vpDist=null,laA=null,raA=null,llA=null,rlA=null;
+
+  if (armsOK) {
+    laA=angle(lS,lW); raA=angle(rS,rW);
+    armDev=Math.abs(laA-raA); if(armDev>180) armDev=360-armDev;
+    vpPt=intersect(lineTh(lS,lW),lineTh(rS,rW));
+    if(vpPt) vpDist=ndist(vpPt);
+  }
+  if (legsOK) { llA=angle(lH,lA); rlA=angle(rH,rA); }
+
+  const isPar = armDev!==null && armDev<S.threshold;
+
+  // ── Horizon ────────────────────────────────────────────────────────────
+  if (S.showHorizon && armDev!==null && armDev<S.threshold*3 && !S.hidden.has('horizon')) {
+    const al=Math.max(0,1-armDev/(S.threshold*3));
+    const hy=(lS.y+lW.y+rS.y+rW.y)/4;
+    regLine('horizon','Horizon / line at ∞', 0,hy,S.W,hy, 2);
+    const col=`rgba(232,201,122,${al*0.85})`;
+    const isHov=S.hovered==='horizon';
+    outlinedLine(0,hy,S.W,hy, isHov?'#fff':col, isHov?3:2, 2, [8,10]);
+    ctx.fillStyle=`rgba(232,201,122,${al*0.7})`; ctx.textAlign='right';
+    ctx.textBaseline='bottom'; ctx.font=`italic ${Math.round(12*s)}px Cormorant Garamond,serif`;
+    ctx.fillText('line at ∞', S.W-8, hy-4);
+  }
+
+  // ── Extended arm lines ─────────────────────────────────────────────────
+  if (S.showArmLines && armsOK) {
+    const col=isPar?'rgba(176,140,10,0.95)':'rgba(210,178,110,0.85)';
+    const lw=isPar?7:5;
+    if (!S.hidden.has('arm-left')) {
+      const e=extend(lS,lW);
+      regLine('arm-left','Left arm line (extended)',e.x1,e.y1,e.x2,e.y2,lw);
+      outlinedLine(e.x1,e.y1,e.x2,e.y2,
+        S.hovered==='arm-left'?'#fff':col, lw,4,[9,7]);
+      if(laA!==null) angleLabel((lS.x+lW.x)/2,(lS.y+lW.y)/2-18*s,laA.toFixed(1)+'°','rgba(140,95,15,.9)');
+    }
+    if (!S.hidden.has('arm-right')) {
+      const e=extend(rS,rW);
+      regLine('arm-right','Right arm line (extended)',e.x1,e.y1,e.x2,e.y2,lw);
+      outlinedLine(e.x1,e.y1,e.x2,e.y2,
+        S.hovered==='arm-right'?'#fff':col, lw,4,[9,7]);
+      if(raA!==null) angleLabel((rS.x+rW.x)/2,(rS.y+rW.y)/2-18*s,raA.toFixed(1)+'°','rgba(140,95,15,.9)');
+    }
+  }
+
+  // ── Extended leg lines ─────────────────────────────────────────────────
+  if (S.showLegLines && legsOK) {
+    const bluec='rgba(20,80,160,0.9)';
+    if (!S.hidden.has('leg-left')) {
+      const e=extend(lH,lA,3);
+      regLine('leg-left','Left leg line (extended)',e.x1,e.y1,e.x2,e.y2,5);
+      outlinedLine(e.x1,e.y1,e.x2,e.y2,
+        S.hovered==='leg-left'?'#fff':bluec, 5,3,[6,8]);
+      if(llA!==null) angleLabel((lH.x+lA.x)/2-25*s,(lH.y+lA.y)/2,llA.toFixed(1)+'°',bluec);
+    }
+    if (!S.hidden.has('leg-right')) {
+      const e=extend(rH,rA,3);
+      regLine('leg-right','Right leg line (extended)',e.x1,e.y1,e.x2,e.y2,5);
+      outlinedLine(e.x1,e.y1,e.x2,e.y2,
+        S.hovered==='leg-right'?'#fff':bluec, 5,3,[6,8]);
+      if(rlA!==null) angleLabel((rH.x+rA.x)/2+25*s,(rH.y+rA.y)/2,rlA.toFixed(1)+'°',bluec);
+    }
+  }
+
+  // ── Skeleton ───────────────────────────────────────────────────────────
+  if (S.showSkeleton) {
+    const segs=[
+      ['skel-lua','Left upper arm',lS,lE],['skel-lfa','Left forearm',lE,lW],
+      ['skel-rua','Right upper arm',rS,rE],['skel-rfa','Right forearm',rE,rW],
+      ['skel-sh','Shoulders',lS,rS],['skel-hi','Hips',lH,rH],
+      ['skel-lto','Left torso',lS,lH],['skel-rto','Right torso',rS,rH],
+      ['skel-lth','Left thigh',lH,lK],['skel-lsh','Left shin',lK,lA],
+      ['skel-rth','Right thigh',rH,rK],['skel-rsh','Right shin',rK,rA],
+    ];
+    segs.forEach(([id,label,a,b]) => {
+      if(a.v<MV||b.v<MV||S.hidden.has(id)) return;
+      regLine(id,label,a.x,a.y,b.x,b.y,2.5);
+      const col=S.hovered===id?'#fff':'rgba(140,95,15,0.8)';
+      outlinedLine(a.x,a.y,b.x,b.y,col,2.5,2.5,null);
+    });
+    const jts=[
+      [lS,'jt-ls','L shoulder'],[rS,'jt-rs','R shoulder'],
+      [lE,'jt-le','L elbow'],[rE,'jt-re','R elbow'],
+      [lW,'jt-lw','L wrist'],[rW,'jt-rw','R wrist'],
+      [lH,'jt-lh','L hip'],[rH,'jt-rh','R hip'],
+      [lK,'jt-lk','L knee'],[rK,'jt-rk','R knee'],
+      [lA,'jt-la','L ankle'],[rA,'jt-ra','R ankle'],
+    ];
+    jts.forEach(([p,id,label])=>{
+      if(p.v<MV||S.hidden.has(id)) return;
+      regDot(id,label,p.x,p.y,7);
+      const isArm=id.includes('s')||id.includes('e')||id.includes('w');
+      const col=S.hovered===id?'#fff':(isArm?'rgba(140,95,15,.9)':'rgba(20,80,160,.9)');
+      outlinedDot(p.x,p.y,7,col);
+    });
+  }
+
+  // ── Vanishing point ────────────────────────────────────────────────────
+  if (S.showVP && vpPt && armsOK && !S.hidden.has('vp')) {
+    const inf=vpPt.x<-S.W||vpPt.x>S.W*2||vpPt.y<-S.H||vpPt.y>S.H*2;
+    if (!inf) {
+      regDot('vp','Vanishing point',vpPt.x,vpPt.y,isPar?14:10);
+      const gr=60*s;
+      const grd=ctx.createRadialGradient(vpPt.x,vpPt.y,0,vpPt.x,vpPt.y,gr);
+      grd.addColorStop(0,`rgba(232,201,122,${isPar?.7:.45})`);
+      grd.addColorStop(.4,'rgba(176,140,10,.08)'); grd.addColorStop(1,'rgba(176,140,10,0)');
+      ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(vpPt.x,vpPt.y,gr,0,Math.PI*2); ctx.fill();
+      const dr=(isPar?14:10)*s;
+      const col=S.hovered==='vp'?'#fff':(isPar?'rgba(176,140,10,1)':'rgba(140,95,15,.9)');
+      outlinedDot(vpPt.x,vpPt.y,isPar?14:10,col);
+      ctx.fillStyle='rgba(176,140,10,.9)';
+      ctx.font=`italic ${Math.round(13*s)}px Cormorant Garamond,serif`;
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillText(isPar?'VP → ∞':'VP', vpPt.x, vpPt.y-dr-6*s);
+      if(armDev!==null) angleLabel(vpPt.x,vpPt.y+dr+16*s,'Δ '+armDev.toFixed(1)+'°',
+        isPar?'rgba(176,140,10,.95)':'rgba(140,95,15,.8)');
+    } else {
+      // off-frame arrow
+      regLine('vp','Vanishing point direction', S.W/2,S.H/2,
+        S.W/2+(vpPt.x-S.W/2)/Math.hypot(vpPt.x-S.W/2,vpPt.y-S.H/2)*Math.min(S.W,S.H)*.35,
+        S.H/2+(vpPt.y-S.H/2)/Math.hypot(vpPt.x-S.W/2,vpPt.y-S.H/2)*Math.min(S.W,S.H)*.35,2);
+      const ux=(vpPt.x-S.W/2)/Math.hypot(vpPt.x-S.W/2,vpPt.y-S.H/2);
+      const uy=(vpPt.y-S.H/2)/Math.hypot(vpPt.x-S.W/2,vpPt.y-S.H/2);
+      const ed=Math.min(S.W,S.H)*.38;
+      outlinedLine(S.W/2,S.H/2, S.W/2+ux*ed,S.H/2+uy*ed, 'rgba(176,140,10,.7)',2,1.5,null);
+      ctx.fillStyle='rgba(176,140,10,.8)'; ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.font=`italic ${Math.round(12*s)}px Cormorant Garamond,serif`;
+      ctx.fillText('VP → ∞', S.W/2+ux*(ed+14), S.H/2+uy*(ed+14));
+    }
+  }
+
+  // ── Harmonic pencil analysis ──────────────────────────────────────────────
+  if (S.showHarmonic && armsVis) {
+    // We have up to 4 natural lines through the body's center:
+    // L1 = left arm direction, L2 = right arm direction
+    // L3 = left leg direction (if visible), L4 = right leg direction
+    // Plus: L_horiz = horizontal, L_vert = vertical
+    // Compute cross ratios for various groupings of 4 lines.
+
+    // Center point: midpoint of shoulders (common "origin" for the pencil)
+    const ctrX = (lShoulder.x + rShoulder.x) / 2;
+    const ctrY = (lShoulder.y + rShoulder.y) / 2;
+    const ctr  = { x: ctrX, y: ctrY };
+
+    // Arm angles as lines through ctr
+    const aLA = laA !== null ? laA * Math.PI/180 : null;
+    const aRA = raA !== null ? raA * Math.PI/180 : null;
+    const aLL = llA !== null ? llA * Math.PI/180 : null;
+    const aRL = rlA !== null ? rlA * Math.PI/180 : null;
+    const aH  = 0;                   // horizontal
+    const aV  = Math.PI/2;           // vertical
+
+    let bestCR = null, bestConfig = '', bestAngles = [], bestLabels = [];
+
+    // ── Case 1: arms + legs ─────────────────────────────────────────────
+    if (aLA!==null && aRA!==null && aLL!==null && aRL!==null) {
+      const cr1 = crossRatioLines(aLA, aRA, aLL, aRL);
+      const cr2 = crossRatioLines(aLA, aRA, aRL, aLL);
+      const best = Math.abs(Math.abs(cr1)-1) < Math.abs(Math.abs(cr2)-1) ? cr1 : cr2;
+      if (bestCR===null || Math.abs(Math.abs(best)-1) < Math.abs(Math.abs(bestCR)-1)) {
+        bestCR = best;
+        bestConfig = 'arms + legs';
+        bestAngles = [aLA, aRA, aLL, aRL];
+        bestLabels = ['L arm','R arm','L leg','R leg'];
+      }
+    }
+
+    // ── Case 2: arms + horizontal + vertical ────────────────────────────
+    if (aLA!==null && aRA!==null) {
+      const cr = crossRatioLines(aLA, aRA, aH, aV);
+      if (bestCR===null || Math.abs(Math.abs(cr)-1) < Math.abs(Math.abs(bestCR)-1)) {
+        bestCR = cr;
+        bestConfig = 'arms + horizontal + vertical';
+        bestAngles = [aLA, aRA, aH, aV];
+        bestLabels = ['L arm','R arm','horiz','vert'];
+      }
+    }
+
+    // ── Case 3: arm bisectors ───────────────────────────────────────────
+    if (aLA!==null && aRA!==null) {
+      const [b1, b2] = angleBisectors(aLA, aRA);
+      const crBis = crossRatioLines(aLA, aRA, b1, b2);
+      // This should always be 1 by definition — but shows the bisectors
+
+      // More interesting: find the harmonic conjugate of one leg
+      if (aLL!==null) {
+        const a4 = harmonicConjugateAngle(aLA, aRA, aLL);
+        const crConj = crossRatioLines(aLA, aRA, aLL, a4);
+        // Draw the harmonic conjugate line as the "implied fourth line"
+        if (S.showHarmonic) {
+          const e4 = lineAtAngle(ctr, a4, W, H);
+          ctx.save();
+          ctx.strokeStyle = 'rgba(176,140,10,0.35)';
+          ctx.lineWidth   = 1.5 * S.scale;
+          ctx.setLineDash([4*S.scale, 8*S.scale]);
+          ctx.beginPath(); ctx.moveTo(e4.x1,e4.y1); ctx.lineTo(e4.x2,e4.y2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+
+          // Label it
+          ctx.fillStyle = 'rgba(176,140,10,0.5)';
+          ctx.font = `italic ${Math.round(10*S.scale)}px Cormorant Garamond, serif`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          const lx4 = ctr.x + Math.cos(a4)*50*S.scale;
+          const ly4 = ctr.y + Math.sin(a4)*50*S.scale;
+          ctx.fillText('conj(L leg)', lx4, ly4);
+        }
+      }
+    }
+
+    // ── Draw the best harmonic pencil ────────────────────────────────────
+    if (S.showHarmonic && bestAngles.length === 4) {
+      const isHarm = isFinite(bestCR) && Math.abs(Math.abs(bestCR)-1) < 0.08;
+
+      // Color scheme: purple for harmonic, amber for near
+      const baseCol = isHarm ? 'rgba(160,120,200,' : 'rgba(140,95,15,';
+      const cols = [
+        baseCol+'0.9)', baseCol+'0.9)',
+        'rgba(20,80,160,0.8)', 'rgba(20,80,160,0.8)',
+      ];
+
+      drawHarmonicPencil(ctr, bestAngles, cols, bestLabels, W, H);
+
+      // Draw the angle bisectors of the first pair (always CR=1 by def)
+      if (aLA!==null && aRA!==null) {
+        const [b1,b2] = angleBisectors(aLA, aRA);
+        const eb1 = lineAtAngle(ctr, b1, W, H);
+        const eb2 = lineAtAngle(ctr, b2, W, H);
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(160,120,200,0.3)';
+        ctx.lineWidth   = 1.2 * S.scale;
+        ctx.setLineDash([3*S.scale, 6*S.scale]);
+        [eb1, eb2].forEach(e => {
+          ctx.beginPath(); ctx.moveTo(e.x1,e.y1); ctx.lineTo(e.x2,e.y2);
+          ctx.stroke();
+        });
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // Label bisectors
+        ctx.fillStyle = 'rgba(160,120,200,0.45)';
+        ctx.font = `italic ${Math.round(9*S.scale)}px EB Garamond, serif`;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText('bisector', ctr.x + Math.cos(b1)*45*S.scale + 4,
+                                 ctr.y + Math.sin(b1)*45*S.scale);
+        ctx.fillText('bisector⊥', ctr.x + Math.cos(b2)*45*S.scale + 4,
+                                  ctr.y + Math.sin(b2)*45*S.scale);
+      }
+
+      // CR annotation near center
+      const crStr = isFinite(bestCR) ? Math.abs(bestCR).toFixed(3) : '∞';
+      const col   = isHarm ? 'rgba(160,120,200,0.9)' : 'rgba(140,95,15,0.7)';
+      ctx.fillStyle = 'rgba(8,10,16,0.75)';
+      const tw = ctx.measureText('CR = '+crStr).width + 12;
+      ctx.fillRect(ctr.x - tw/2 - 6, ctr.y - 28*S.scale - 8,
+                   tw + 12, 20*S.scale);
+      ctx.fillStyle = col;
+      ctx.font = `italic ${Math.round(13*S.scale)}px Cormorant Garamond, serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(`CR = ${crStr}`, ctr.x, ctr.y - 16*S.scale);
+      if (isHarm) {
+        ctx.fillStyle = 'rgba(160,120,200,0.7)';
+        ctx.font = `italic ${Math.round(10*S.scale)}px EB Garamond, serif`;
+        ctx.fillText('harmonic pencil', ctr.x, ctr.y - 4*S.scale);
+      }
+    }
+
+    // Update sidebar
+    updateCRDisplay(bestCR, bestConfig);
+  } else if (!S.showHarmonic) {
+    updateCRDisplay(null, '');
+  }
+
+  // parallel border flash
+  if(isPar){
+    ctx.strokeStyle='rgba(176,140,10,.4)'; ctx.lineWidth=4*s;
+    ctx.strokeRect(4,4,S.W-8,S.H-8);
+  }
+
+  // edit mode canvas hint
+  if(S.editMode){
+    ctx.fillStyle='rgba(176,140,10,.6)';
+    ctx.font=`italic ${Math.round(11*s)}px EB Garamond,serif`;
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText('✎  hover to highlight · click to hide/restore', 10*s, 10*s);
+  }
+
+  // ── HUD ────────────────────────────────────────────────────────────────
+  const fmt=v=>v!==null?v.toFixed(1):'—';
+  document.getElementById('sLA').innerHTML=`${fmt(laA)}<span class="stat-unit">°</span>`;
+  document.getElementById('sRA').innerHTML=`${fmt(raA)}<span class="stat-unit">°</span>`;
+  document.getElementById('sDev').innerHTML=`${fmt(armDev)}<span class="stat-unit">°</span>`;
+  document.getElementById('sLL').innerHTML=`${fmt(llA)}<span class="stat-unit">°</span>`;
+  document.getElementById('sRL').innerHTML=`${fmt(rlA)}<span class="stat-unit">°</span>`;
+  document.getElementById('sVP').textContent=vpDist!==null?(vpDist>=9.9?'→ ∞':vpDist.toFixed(2)):'—';
+
+  const eq=document.getElementById('vpEq'), st=document.getElementById('vpSt');
+  const fl=document.getElementById('vpFill');
+  if(armDev===null){ eq.textContent='—'; eq.className='vp-eq';
+    st.textContent='arms not detected'; st.className='vp-st'; fl.style.width='0%'; }
+  else if(isPar){ eq.textContent='arms ∥ → VP at ∞'; eq.className='vp-eq proj';
+    st.textContent=`projective · Δ=${armDev.toFixed(1)}°`; st.className='vp-st proj';
+    fl.style.width='100%'; }
+  else { const f=Math.max(0,1-armDev/S.threshold);
+    eq.textContent=`arms ∦ (Δ=${armDev.toFixed(1)}°)`; eq.className='vp-eq';
+    st.textContent=`VP dist ${vpDist!==null?vpDist.toFixed(2):'—'}`; st.className='vp-st';
+    fl.style.width=Math.round(f*100)+'%'; }
+}
+
+// ── Edit mode: hitDiv handles all pointer events ─────────────────────────
+function canvasPt(e) {
+  // hitDiv covers the image-wrap; canvas may be smaller (max-height constrained)
+  // Get the canvas bounding rect, which reflects its actual rendered size
+  const r = canvas.getBoundingClientRect();
+  const sx = S.W / r.width;
+  const sy = S.H / r.height;
+  return {
+    mx: (e.clientX - r.left) * sx,
+    my: (e.clientY - r.top)  * sy,
+  };
+}
+
+hitDiv.addEventListener('pointermove', e => {
+  if (!S.landmarks) return;
+  const {mx,my}=canvasPt(e);
+  // bounds check — pointer may be outside canvas even inside hitDiv
+  if(mx<0||my<0||mx>S.W||my>S.H){ if(S.hovered){S.hovered=null;draw();} return; }
+  const hit=hitTest(mx,my);
+  if(hit!==S.hovered){
+    S.hovered=hit;
+    hitDiv.style.cursor=hit?'pointer':'crosshair';
+    draw();
+    if(hit){
+      const el=reg.find(l=>l.id===hit);
+      const isHid=S.hidden.has(hit);
+      status((isHid?'Click to restore: ':'Click to hide: ')+(el?el.label:hit));
+    } else {
+      status('✎ Hover over a line or point · click to hide it');
+    }
+  }
+});
+
+hitDiv.addEventListener('pointerleave', ()=>{
+  if(S.hovered){ S.hovered=null; draw(); }
+  if(S.editMode) status('✎ Hover over a line or point · click to hide it');
+});
+
+hitDiv.addEventListener('pointerdown', e=>{
+  if(!S.landmarks) return;
+  const {mx,my}=canvasPt(e);
+  if(mx<0||my<0||mx>S.W||my>S.H) return;
+
+  // Try visible first
+  let hit=hitTest(mx,my,false);
+
+  // Try hidden if nothing visible found (to allow restore)
+  if(!hit){
+    hit=hitTest(mx,my,true);
+    if(hit && !S.hidden.has(hit)) hit=null;
+  }
+
+  if(!hit){ status('Nothing found — click closer to a line or joint.'); return; }
+
+  const el=reg.find(l=>l.id===hit)||{label:hit};
+  if(S.hidden.has(hit)){ S.hidden.delete(hit); status('Restored: '+el.label); }
+  else                  { S.hidden.add(hit);    status('Hidden: '+el.label); }
+
+  S.hovered=null;
+  updateHiddenList();
+  draw();
+});
+
+// ── Edit mode toggle ──────────────────────────────────────────────────────
+function setEditMode(on) {
+  S.editMode=on;
+  hitDiv.style.display   = on ? 'block' : 'none';
+  editHint.style.display = on ? 'block' : 'none';
+  document.getElementById('editBtn').className = on ? 'btn on' : 'btn sec';
+  document.getElementById('editBtn').textContent = on ? 'Done editing' : 'Edit lines';
+  if(!on){ S.hovered=null; }
+  if(S.loaded) draw();
+  status(on ? '✎ Hover over a line or point · click to hide it' : 'Edit mode off.');
+}
+
+document.getElementById('editBtn').addEventListener('click',()=>setEditMode(!S.editMode));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&S.editMode) setEditMode(false); });
+
+// ── Hidden list ────────────────────────────────────────────────────────────
+function updateHiddenList(){
+  const list=document.getElementById('hiddenList');
+  if(S.hidden.size===0){
+    list.innerHTML='<span style="font-size:.73rem;color:#3a3f4d;font-style:italic;">None hidden.</span>';
+    return;
+  }
+  list.innerHTML='';
+  S.hidden.forEach(id=>{
+    const el=reg.find(l=>l.id===id);
+    const label=el?el.label:id;
+    const row=document.createElement('div');
+    row.className='hidden-item';
+    row.innerHTML=`<span style="font-style:italic">${label}</span>
+      <span class="restore" data-id="${id}">restore</span>`;
+    row.querySelector('.restore').addEventListener('click',()=>{
+      S.hidden.delete(id); updateHiddenList(); draw();
+    });
+    list.appendChild(row);
+  });
+}
+
+// ── Image loading ─────────────────────────────────────────────────────────
+function loadFile(file){
+  if(!file||!file.type.startsWith('image/')) return;
+  status('Loading '+file.name+'…');
+  const url=URL.createObjectURL(file);
+  img.onload=()=>{
+    S.W=img.naturalWidth; S.H=img.naturalHeight;
+    canvas.width=S.W; canvas.height=S.H;
+    S.landmarks=null; S.hidden.clear(); S.hovered=null;
+    ctx.drawImage(img,0,0);
+    dropZone.classList.add('gone');
+    actionRow.style.display='flex';
+    S.loaded=true;
+    updateHiddenList();
+    status(`${S.W}×${S.H}px loaded — click Analyze pose.`);
+  };
+  img.onerror=()=>status('Could not load image.');
+  img.src=url;
+}
+
+// ── Buttons ───────────────────────────────────────────────────────────────
+document.getElementById('analyzeBtn').addEventListener('click',async()=>{
+  if(!S.loaded) return;
+  status('Running pose detection…');
+  document.getElementById('analyzeBtn').disabled=true;
+  await pose.send({image:img});
+});
+
+document.getElementById('saveBtn').addEventListener('click',()=>{
+  if(!S.loaded) return;
+  const a=document.createElement('a');
+  a.download='ballet_geometry.png';
+  a.href=canvas.toDataURL('image/png');
+  a.click();
+  status('Saved.');
+});
+
+document.getElementById('restoreBtn').addEventListener('click',()=>{
+  S.hidden.clear(); updateHiddenList(); if(S.loaded) draw(); status('All restored.');
+});
+
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  S.landmarks=null; S.hidden.clear(); setEditMode(false); updateHiddenList();
+  ctx.clearRect(0,0,S.W,S.H); ctx.globalAlpha=S.opacity;
+  ctx.drawImage(img,0,0,S.W,S.H); ctx.globalAlpha=1;
+  status('Overlay cleared.');
+});
+
+document.getElementById('newBtn').addEventListener('click',()=>{
+  S.loaded=false; S.landmarks=null; S.hidden.clear(); setEditMode(false); updateHiddenList();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  dropZone.classList.remove('gone');
+  actionRow.style.display='none';
+  status('Load an image to begin.');
+});
+
+// ── Sliders & toggles ─────────────────────────────────────────────────────
+document.getElementById('scaleSlider').addEventListener('input',e=>{
+  S.scale=+e.target.value;
+  document.getElementById('scaleVal').textContent=S.scale.toFixed(1)+'×';
+  if(S.loaded) draw();
+});
+document.getElementById('threshSlider').addEventListener('input',e=>{
+  S.threshold=+e.target.value;
+  document.getElementById('threshVal').textContent=S.threshold+'°';
+  if(S.landmarks) draw();
+});
+document.getElementById('opacSlider').addEventListener('input',e=>{
+  S.opacity=e.target.value/100;
+  document.getElementById('opacVal').textContent=e.target.value+'%';
+  if(S.loaded) draw();
+});
+['showSkeleton','showArmLines','showLegLines','showVP','showHorizon','showAngles','showHarmonic'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',e=>{
+    S[id]=e.target.checked; if(S.loaded) draw();
+  });
+});
+
+// ── File picking ───────────────────────────────────────────────────────────
+document.getElementById('chooseBtn').addEventListener('click',e=>{
+  e.stopPropagation(); fileInput.click();
+});
+dropZone.addEventListener('click',()=>fileInput.click());
+fileInput.addEventListener('change',e=>{
+  loadFile(e.target.files&&e.target.files[0]); fileInput.value='';
+});
+const wrap=document.getElementById('imageWrap');
+wrap.addEventListener('dragover',e=>{e.preventDefault();});
+wrap.addEventListener('drop',e=>{
+  e.preventDefault();
+  loadFile(e.dataTransfer.files&&e.dataTransfer.files[0]);
+});
+</script>
+</body>
+</html>

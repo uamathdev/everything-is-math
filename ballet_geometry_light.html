@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ballet Geometry Analyzer (Light)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --deep:   #f5f0e8;
+    --mid:    #ede8dc;
+    --surf:   #e4ddd0;
+    --gold:   #9a7020;
+    --gold-d: #c8a96e;
+    --blue:   #2060a0;
+    --amber:  #b08010;
+    --rose:   #8a2040;
+    --green:  #147050;
+    --text:   #2c2820;
+    --muted:  #6b6560;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--deep);
+    color: var(--text);
+    font-family: 'EB Garamond', Georgia, serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  header {
+    padding: 1.4rem 2rem 0.8rem;
+    border-bottom: 1px solid #d0c8b8;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  header h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 1.3rem;
+    color: var(--gold);
+    font-style: italic;
+  }
+
+  header p {
+    font-size: 0.76rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* ── Main layout ── */
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    height: calc(100vh - 56px);
+  }
+
+  /* ── Left: video + overlay ── */
+  .video-col {
+    display: flex;
+    flex-direction: column;
+    padding: 1.2rem;
+    gap: 1rem;
+    overflow: hidden;
+  }
+
+  .video-wrap {
+    position: relative;
+    background: #0a0c10;
+    border-radius: 4px;
+    overflow: hidden;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #inputVideo {
+    display: none;  /* always hidden — we draw to canvas */
+  }
+
+  #overlayCanvas {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    display: block;
+    object-fit: contain;
+  }
+
+  .video-wrap {
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+  }
+
+  .drop-zone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .drop-zone:hover { background: rgba(200,169,110,0.03); }
+
+  .drop-zone .icon {
+    font-size: 2.5rem;
+    opacity: 0.25;
+  }
+
+  .drop-zone p {
+    color: var(--muted);
+    font-style: italic;
+    font-size: 0.9rem;
+    text-align: center;
+  }
+
+  .drop-zone .hint {
+    font-size: 0.75rem;
+    color: #3a3f4d;
+  }
+
+  #fileInput { display: none; }
+
+  /* Video controls */
+  .vid-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    padding: 0.4rem 1rem;
+    background: transparent;
+    border: 1px solid var(--gold-d);
+    border-radius: 3px;
+    color: var(--gold);
+    font-family: 'EB Garamond', serif;
+    font-size: 0.84rem;
+    cursor: pointer;
+    font-style: italic;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: rgba(200,169,110,0.07); }
+  .btn:disabled { opacity: 0.3; cursor: default; }
+  .btn.secondary { border-color: #d0c8b8; color: var(--muted); }
+
+  .scrubber {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 1px;
+    background: #d0c8b8;
+    outline: none;
+    cursor: pointer;
+  }
+  .scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 5px rgba(200,169,110,0.5);
+  }
+
+  .time-display {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-style: italic;
+    min-width: 5rem;
+    text-align: right;
+  }
+
+  /* ── Time series charts ── */
+  .charts-row {
+    display: flex;
+    gap: 0.8rem;
+    flex-shrink: 0;
+    height: 110px;
+  }
+
+  .chart-wrap {
+    flex: 1;
+    background: var(--mid);
+    border: 1px solid #d0c8b8;
+    border-radius: 3px;
+    padding: 0.4rem 0.6rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chart-wrap canvas { display: block; }
+
+  .chart-label {
+    position: absolute;
+    top: 4px; left: 6px;
+    font-size: 0.68rem;
+    color: var(--muted);
+    font-style: italic;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+  }
+
+  .chart-val {
+    position: absolute;
+    top: 4px; right: 6px;
+    font-size: 0.75rem;
+    color: var(--gold);
+    font-style: italic;
+    pointer-events: none;
+  }
+
+  /* ── Right sidebar ── */
+  .sidebar {
+    border-left: 1px solid #d0c8b8;
+    padding: 1.4rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+    overflow-y: auto;
+  }
+
+  .sidebar h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 400;
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.7rem;
+  }
+
+  /* Vanishing point display */
+  .vp-display {
+    background: var(--mid);
+    border: 1px solid #d0c8b8;
+    border-radius: 3px;
+    padding: 0.8rem;
+    text-align: center;
+  }
+
+  .vp-eq {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 1.5rem;
+    color: var(--muted);
+    transition: color 0.3s;
+    margin-bottom: 0.2rem;
+  }
+  .vp-eq.projective { color: var(--amber); }
+
+  .vp-status {
+    font-size: 0.76rem;
+    color: var(--muted);
+    font-style: italic;
+    transition: color 0.3s;
+  }
+  .vp-status.projective { color: var(--amber); }
+
+  .vp-bar { height: 1px; background: #d0c8b8; margin-top: 0.6rem; border-radius: 1px; overflow: hidden; }
+  .vp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), var(--amber));
+    border-radius: 1px;
+    transition: width 0.2s;
+    box-shadow: 0 0 6px rgba(232,201,122,0.5);
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .stat-box {
+    background: var(--mid);
+    border: 1px solid #d0c8b8;
+    border-radius: 3px;
+    padding: 0.6rem 0.7rem;
+  }
+
+  .stat-label {
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+  }
+
+  .stat-val {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 1.2rem;
+    color: var(--gold);
+  }
+
+  .stat-unit {
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  /* Layer toggles */
+  .toggle-group { display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    font-size: 0.84rem;
+    color: var(--text);
+    user-select: none;
+  }
+
+  .toggle input { display: none; }
+
+  .toggle-track {
+    width: 26px; height: 13px;
+    border-radius: 7px;
+    background: #d0c8b8;
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle input:checked + .toggle-track { background: rgba(200,169,110,0.15); }
+  .toggle input:checked + .toggle-track::after { transform: translateX(13px); background: var(--gold); }
+
+  .swatch {
+    width: 18px; height: 2px;
+    border-radius: 1px;
+    display: inline-block;
+    margin-left: auto;
+  }
+
+  /* Threshold slider */
+  .thresh-wrap { display: flex; flex-direction: column; gap: 0.4rem; }
+  .thresh-label { display: flex; justify-content: space-between; font-size: 0.82rem; }
+  .thresh-label span:last-child { color: var(--gold); font-style: italic; }
+  input[type=range].thresh {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 1px;
+    background: #d0c8b8; outline: none; cursor: pointer;
+  }
+  input[type=range].thresh::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 5px rgba(232,201,122,0.4);
+  }
+
+  /* Event log */
+  .event-log {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-height: 80px;
+    max-height: 200px;
+  }
+
+  .event-entry {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.76rem;
+    padding: 0.25rem 0.4rem;
+    border-radius: 2px;
+    border-left: 2px solid transparent;
+    transition: background 0.2s;
+  }
+
+  .event-entry.parallel {
+    border-left-color: var(--amber);
+    background: rgba(232,201,122,0.05);
+  }
+
+  .event-entry.near { border-left-color: var(--gold-d); }
+
+  .event-time {
+    color: var(--muted);
+    font-style: italic;
+    min-width: 2.8rem;
+    font-size: 0.72rem;
+  }
+
+  .event-desc { color: var(--text); }
+
+  .note {
+    font-size: 0.76rem;
+    color: var(--muted);
+    font-style: italic;
+    line-height: 1.65;
+  }
+
+  /* Loading indicator */
+  .loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(245,240,232,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.8rem;
+    font-style: italic;
+    color: var(--muted);
+    font-size: 0.9rem;
+    z-index: 10;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="openBanner" style="
+  background: rgba(154,112,32,.10);
+  border-bottom: 1px solid rgba(200,169,110,0.25);
+  padding: 0.7rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: EB Garamond, serif;
+  font-size: 0.84rem;
+  color: #c8a96e;
+  font-style: italic;
+">
+  <span>
+    ⬡ &nbsp;This tool requires a real browser to decode video.
+    Save this file to your computer, then open it in
+    <strong>Chrome</strong> or <strong>Safari</strong>
+    by double-clicking it or dragging it onto the browser window.
+  </span>
+  <span style="
+    cursor: pointer;
+    color: #7a7568;
+    font-size: 1rem;
+    flex-shrink: 0;
+  " onclick="this.parentElement.style.display='none'">✕</span>
+</div>
+
+<header>
+  <h1>Ballet Geometry Analyzer</h1>
+  <p>projective configurations latent in the dancing body · after Shipman &amp; Newell</p>
+</header>
+
+<div class="workspace">
+
+  <!-- ── Left column ── -->
+  <div class="video-col">
+
+    <div class="video-wrap" id="videoWrap">
+      <video id="inputVideo" playsinline></video>
+      <canvas id="overlayCanvas"></canvas>
+
+      <div class="drop-zone" id="dropZone">
+        <div class="icon">⬡</div>
+        <p>Drop a ballet video here<br>or click to choose a file</p>
+        <p class="hint">MP4, MOV, WebM · analysis runs in your browser</p>
+        <button id="explicitBtn" style="
+          margin-top:0.8rem;
+          padding:0.5rem 1.4rem;
+          background:transparent;
+          border:1px solid #7a6540;
+          border-radius:3px;
+          color:#c8a96e;
+          font-family:EB Garamond,serif;
+          font-size:0.9rem;
+          font-style:italic;
+          cursor:pointer;">
+          Choose video file
+        </button>
+      </div>
+      <div id="debugPanel" style="
+        display:none;
+        position:absolute;
+        bottom:0; left:0; right:0;
+        background:rgba(245,240,232,0.92);
+        padding:0.5rem 1rem 0.5rem 1rem;
+        font-size:0.68rem;
+        font-family:monospace;
+        color:#7a7568;
+        max-height:28%;
+        overflow-y:auto;
+        z-index:20;
+        border-top:1px solid #d0c8b8;">
+        <div style="
+          position:sticky; top:0;
+          display:flex; justify-content:space-between; align-items:center;
+          background:rgba(245,240,232,0.95);
+          padding:0.2rem 0;
+          margin-bottom:0.3rem;
+          border-bottom:1px solid #e4ddd0;">
+          <span style="color:#4a5060;letter-spacing:0.08em;font-size:0.65rem;">
+            DIAGNOSTIC LOG
+          </span>
+          <span id="debugClose" style="cursor:pointer;color:#7a7568;padding:0 0.2rem;"
+                onclick="document.getElementById('debugPanel').style.display='none'">
+            ✕ hide
+          </span>
+        </div>
+        <div id="debugLines"></div>
+      </div>
+
+      <div class="loading" id="loadingIndicator">
+        <div>Loading pose model…</div>
+      </div>
+    </div>
+
+    <div class="vid-controls" id="vidControls" style="display:none">
+      <button class="btn" id="playBtn">Play</button>
+      <input type="range" class="scrubber" id="scrubber" min="0" max="100" value="0" step="0.1">
+      <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+      <button class="btn secondary" id="resetBtn">↺</button>
+    </div>
+
+    <div class="charts-row" id="chartsRow" style="display:none">
+      <div class="chart-wrap">
+        <div class="chart-label">arm parallelism deviation (°)</div>
+        <div class="chart-val" id="armVal">—</div>
+        <canvas id="armChart"></canvas>
+      </div>
+      <div class="chart-wrap" style="border-top:1px solid rgba(110,60,175,.3);">
+        <div class="chart-label" style="color:rgba(160,120,210,.9);">
+          CR(t) &nbsp;<span id="crCurrent" style="float:right;font-size:.85rem;
+            font-style:italic;color:rgba(160,120,210,.8);">—</span>
+        </div>
+        <canvas id="crChart"></canvas>
+        <div style="font-size:.68rem;color:rgba(110,60,175,.5);
+          font-style:italic;padding:.15rem .2rem 0;">
+          harmonic range: CR = −1 &nbsp;(dashed line)
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-label">leg line angle (°)</div>
+        <div class="chart-val" id="legVal">—</div>
+        <canvas id="legChart"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-label">vanishing point distance (normalized)</div>
+        <div class="chart-val" id="vpVal">—</div>
+        <canvas id="vpChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Right sidebar ── -->
+  <div class="sidebar">
+
+    <div>
+      <h2>Projective State</h2>
+      <div class="vp-display">
+        <div class="vp-eq" id="vpEq">arms ∦</div>
+        <div class="vp-status" id="vpStatus">no video loaded</div>
+        <div class="vp-bar"><div class="vp-fill" id="vpFill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div>
+      <h2>Current Frame</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-label">Left arm angle</div>
+          <div class="stat-val" id="statLA">—<span class="stat-unit">°</span></div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Right arm angle</div>
+          <div class="stat-val" id="statRA">—<span class="stat-unit">°</span></div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Deviation</div>
+          <div class="stat-val" id="statDev">—<span class="stat-unit">°</span></div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">VP distance</div>
+          <div class="stat-val" id="statVP">—</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Left leg angle</div>
+          <div class="stat-val" id="statLL">—<span class="stat-unit">°</span></div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Right leg angle</div>
+          <div class="stat-val" id="statRL">—<span class="stat-unit">°</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <h2>Parallel Threshold</h2>
+      <div class="thresh-wrap">
+        <div class="thresh-label">
+          <span>Arms parallel within</span>
+          <span id="threshVal">8°</span>
+        </div>
+        <input type="range" class="thresh" id="threshSlider" min="2" max="20" value="8">
+      </div>
+    </div>
+
+    <div>
+      <h2>Line Thickness</h2>
+      <div class="thresh-wrap">
+        <div class="thresh-label">
+          <span>Scale all lines</span>
+          <span id="scaleVal">1.0×</span>
+        </div>
+        <input type="range" class="thresh" id="scaleSlider"
+               min="0.3" max="3.0" step="0.1" value="1.0">
+      </div>
+    </div>
+
+    <div>
+      <h2>Overlay Layers</h2>
+      <div class="toggle-group">
+        <label class="toggle">
+          <input type="checkbox" id="showSkeleton" checked>
+          <span class="toggle-track"></span>
+          Skeleton
+          <span class="swatch" style="background:rgba(200,169,110,0.6)"></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="showArmLines" checked>
+          <span class="toggle-track"></span>
+          Arm lines extended
+          <span class="swatch" style="background:#c8a96e"></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="showLegLines" checked>
+          <span class="toggle-track"></span>
+          Leg lines extended
+          <span class="swatch" style="background:#6ea8c8"></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="showVP" checked>
+          <span class="toggle-track"></span>
+          Vanishing point
+          <span class="swatch" style="background:#e8c97a"></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="showHorizon" checked>
+          <span class="toggle-track"></span>
+          Horizon / line at ∞
+          <span class="swatch" style="background:rgba(232,201,122,0.3)"></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="showVPTrail" checked>
+          <span class="toggle-track"></span>
+          Arm VP trail
+          <span class="swatch" style="background:#e8c97a"></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="showLegTrail" checked>
+          <span class="toggle-track"></span>
+          Leg intersection trail
+          <span class="swatch" style="background:#6ea8c8"></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="showCrossTrail" checked>
+          <span class="toggle-track"></span>
+          Arm × leg cross trail
+          <span class="swatch" style="background:#c87a8a"></span>
+        </label>
+      </div>
+    </div>
+
+    <div>
+      <h2>Projective Events</h2>
+      <div class="event-log" id="eventLog">
+        <div class="note">Events will appear here as parallel configurations are detected…</div>
+      </div>
+    </div>
+
+    <div>
+      <p class="note">
+        Pose landmarks from MediaPipe Pose (33 keypoints).
+        Arm lines: shoulder→wrist extended. Leg lines: hip→ankle extended.
+        Vanishing point: intersection of the two arm-lines.
+        As arms approach parallel, the VP races toward the frame edge — toward infinity.
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept="video/*,.mov,.MOV,.mp4,.MP4,.webm,.WEBM">
+
+<!-- MediaPipe via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+const state = {
+  loaded: false,
+  playing: false,
+  threshold: 8,       // degrees — "parallel enough"
+  landmarks: null,
+  videoW: 1, videoH: 1,
+
+  // Time series (ring buffer, ~600 frames)
+  history: {
+    armDev: [],   // arm parallelism deviation °
+    legAngle: [], // mean leg angle °
+    vpDist: [],   // normalized VP distance
+    crTime: [],   // cross ratio of 4 body lines (arms + spine + floor)
+    times: [],
+  },
+  maxHistory: 600,
+
+  // Intersection trails (ring buffers)
+  vpTrail:      [],   // arm-arm VP (amber)
+  legTrail:     [],   // leg-leg intersection (blue)
+  crossTrail:   [],   // arm-leg cross intersection (rose)
+  maxTrail: 180,
+  showVPTrail:    true,
+  showLegTrail:   true,
+  showCrossTrail: true,
+
+  // Events
+  events: [],
+  lastEventTime: -2,
+
+  // Toggles
+  showSkeleton: true,
+  showArmLines: true,
+  showLegLines: true,
+  showVP: true,
+  showHorizon: true,
+  showTrail: true,
+  lineScale: 1.0,   // multiplier for all line widths
+};
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const video       = document.getElementById('inputVideo');
+const overlay     = document.getElementById('overlayCanvas');
+const ctx         = overlay.getContext('2d');
+const dropZone    = document.getElementById('dropZone');
+const fileInput   = document.getElementById('fileInput');
+const vidControls = document.getElementById('vidControls');
+const chartsRow   = document.getElementById('chartsRow');
+const playBtn     = document.getElementById('playBtn');
+const scrubber    = document.getElementById('scrubber');
+const timeDisplay = document.getElementById('timeDisplay');
+const loadingEl   = document.getElementById('loadingIndicator');
+const eventLog    = document.getElementById('eventLog');
+
+// Chart canvases
+const armChartC = document.getElementById('armChart');
+const legChartC = document.getElementById('legChart');
+const vpChartC  = document.getElementById('vpChart');
+const crChartC = document.getElementById('crChart');
+const cctx = crChartC.getContext('2d');
+const actx = armChartC.getContext('2d');
+const lctx = legChartC.getContext('2d');
+const vctx = vpChartC.getContext('2d');
+
+// ── MediaPipe Pose ────────────────────────────────────────────────────────
+const pose = new Pose({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+});
+
+pose.setOptions({
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  enableSegmentation: false,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5,
+});
+
+pose.onResults(onPoseResults);
+
+// ── Geometry helpers ──────────────────────────────────────────────────────
+// Line through two points: returns {a, b, c} for ax+by+c=0
+function lineThrough(p1, p2) {
+  const a = p2.y - p1.y;
+  const b = p1.x - p2.x;
+  const c = p2.x * p1.y - p1.x * p2.y;
+  return { a, b, c };
+}
+
+// Intersection of two lines
+function intersect(l1, l2) {
+  const det = l1.a * l2.b - l2.a * l1.b;
+  if (Math.abs(det) < 1e-10) return null; // parallel — at infinity
+  return {
+    x: (l1.b * l2.c - l2.b * l1.c) / (-det),  // corrected signs
+    y: (l2.a * l1.c - l1.a * l2.c) / (-det),
+    atInfinity: false
+  };
+}
+
+// Angle of line through two points (degrees, relative to horizontal)
+function lineAngle(p1, p2) {
+  return Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+}
+
+// Extend a line segment beyond both endpoints to canvas edges
+function extendLine(p1, p2, W, H, extFactor = 5) {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  return {
+    x1: p1.x - dx * extFactor,
+    y1: p1.y - dy * extFactor,
+    x2: p2.x + dx * extFactor,
+    y2: p2.y + dy * extFactor,
+  };
+}
+
+// Normalized distance of a point from canvas centre
+function normalizedDist(pt, W, H) {
+  const dx = (pt.x - W/2) / W;
+  const dy = (pt.y - H/2) / H;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+// Convert normalised landmark to canvas px
+function lm(idx, W, H) {
+  const l = state.landmarks[idx];
+  return { x: l.x * W, y: l.y * H, v: l.visibility };
+}
+
+// ── Cross ratio of four lines through a common point ──────────────────────
+// Lines given by angles in degrees; returns signed CR
+function crFourLines(a1, a2, a3, a4) {
+  const r = Math.PI / 180;
+  const d1=a1*r, d2=a2*r, d3=a3*r, d4=a4*r;
+  const s13 = Math.sin(d1-d3), s24 = Math.sin(d2-d4);
+  const s14 = Math.sin(d1-d4), s23 = Math.sin(d2-d3);
+  if (Math.abs(s14*s23) < 1e-6) return null;
+  return (s13*s24) / (s14*s23);
+}
+
+// Is a CR value harmonic (in group of -1: {-1, 2, 0.5})?
+function isHarmonic(cr, tol=0.12) {
+  if (cr === null || !isFinite(cr)) return false;
+  return Math.abs(cr+1)<tol || Math.abs(cr-2)<tol || Math.abs(cr-0.5)<tol;
+}
+
+// Compute CR of the four body lines at each frame:
+// L1 = right arm direction (rShoulder → rWrist)
+// L2 = left arm direction (lShoulder → lWrist)
+// L3 = spine direction (midHip → midShoulder) ≈ 270° (down) or 90° (up)
+// L4 = floor direction = 0° (always horizontal)
+function computeBodyCR(lms, W, H) {
+  const lS = lm(11,W,H), rS = lm(12,W,H);
+  const lW = lm(15,W,H), rW = lm(16,W,H);
+  const lH = lm(23,W,H), rH = lm(24,W,H);
+  const minV = 0.4;
+  if ([lS,rS,lW,rW,lH,rH].some(p=>p.v<minV)) return null;
+
+  // Arm angles
+  const raAng = lineAngle(rS, rW);  // right arm
+  const laAng = lineAngle(lS, lW);  // left arm
+
+  // Spine: midShoulder → midHip gives "down" direction; take its angle
+  const midSh = {x:(lS.x+rS.x)/2, y:(lS.y+rS.y)/2, v:1};
+  const midHp = {x:(lH.x+rH.x)/2, y:(lH.y+rH.y)/2, v:1};
+  const spineAng = lineAngle(midSh, midHp);  // spine direction (deg)
+
+  // Floor: always 0°
+  const floorAng = 0;
+
+  // Cross ratio: CR(R arm, L arm; spine, floor)
+  // This is the pencil relevant to bilateral ballet positions
+  return crFourLines(raAng, laAng, spineAng, floorAng);
+}
+
+// ── Pose results callback ─────────────────────────────────────────────────
+function onPoseResults(results) {
+  state.landmarks = results.poseLandmarks || null;
+  if (state.landmarks) updateTrails();
+  // drawOverlay() runs every rAF via renderFrame()
+}
+
+
+// ── Draw a line with dark outline for visibility ──────────────────────────
+function strokeWithOutline(ctx, drawFn, color, lineWidth, outlineWidth) {
+  const s = state.lineScale;
+  const lw = lineWidth  * s;
+  const ow = outlineWidth * s;
+  // First pass: thick dark outline
+  ctx.save();
+  ctx.strokeStyle = 'rgba(240,235,225,0.75)';
+  ctx.lineWidth   = lw + ow;
+  drawFn(ctx);
+  ctx.stroke();
+  ctx.restore();
+  // Second pass: colored line on top
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = lw;
+  drawFn(ctx);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── updateTrails: called on each new pose frame, updates trail state ───────
+function updateTrails() {
+  if (!state.landmarks) return;
+  const W = overlay.width, H = overlay.height;
+  const minVis = 0.4;
+  const _lm = (i) => ({
+    x: state.landmarks[i].x * W,
+    y: state.landmarks[i].y * H,
+    v: state.landmarks[i].visibility
+  });
+  const lShoulder=_lm(11), rShoulder=_lm(12);
+  const lWrist=_lm(15),    rWrist=_lm(16);
+  const lHip=_lm(23),      rHip=_lm(24);
+  const lAnkle=_lm(27),    rAnkle=_lm(28);
+  const armsVisible = [lShoulder,lWrist,rShoulder,rWrist].every(p=>p.v>minVis);
+  const legsVisible = [lHip,lAnkle,rHip,rAnkle].every(p=>p.v>minVis);
+  // Also need vpPt for arm trail
+  let vpPt = null;
+  if (armsVisible) {
+    const ll = lineThrough(lShoulder, lWrist);
+    const rl = lineThrough(rShoulder, rWrist);
+    vpPt = intersect(ll, rl);
+  }
+  let legPt = null;
+  if (legsVisible) {
+    legPt = intersect(lineThrough(lHip,lAnkle), lineThrough(rHip,rAnkle));
+  }
+  // Push to trails (body-relative: store offset from CoM)
+  const comPts = [lShoulder, rShoulder, lHip, rHip].filter(p => p.v > 0.3);
+  const com = comPts.length > 0
+    ? { x: comPts.reduce((s,p)=>s+p.x,0)/comPts.length,
+        y: comPts.reduce((s,p)=>s+p.y,0)/comPts.length }
+    : { x: W/2, y: H/2 };
+
+  function pushTrail(arr, pt) {
+    if (!pt || !isFinite(pt.x) || !isFinite(pt.y)) return;
+    if (Math.abs(pt.x) > W*5 || Math.abs(pt.y) > H*5) return;
+    if (arr.length >= state.maxTrail) arr.shift();
+    arr.push({ dx: pt.x - com.x, dy: pt.y - com.y,
+               comX: com.x, comY: com.y });
+  }
+
+  if (armsVisible) pushTrail(state.vpTrail, vpPt);
+  if (legsVisible) pushTrail(state.legTrail, legPt);
+
+  if (armsVisible && legsVisible) {
+    const crossA = intersect(lineThrough(lShoulder,lWrist), lineThrough(rHip,rAnkle));
+    const crossB = intersect(lineThrough(rShoulder,rWrist), lineThrough(lHip,lAnkle));
+    if (crossA && crossB)
+      pushTrail(state.crossTrail, {x:(crossA.x+crossB.x)/2, y:(crossA.y+crossB.y)/2});
+    else if (crossA) pushTrail(state.crossTrail, crossA);
+    else if (crossB) pushTrail(state.crossTrail, crossB);
+  }
+}
+
+function drawOverlay() {
+  const W = overlay.width, H = overlay.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const lms = state.landmarks;
+  if (!lms) return;
+
+  // Key landmarks (MediaPipe indices)
+  // 11=L shoulder, 12=R shoulder, 13=L elbow, 14=R elbow
+  // 15=L wrist, 16=R wrist
+  // 23=L hip, 24=R hip, 25=L knee, 26=R knee, 27=L ankle, 28=R ankle
+  const lShoulder = lm(11, W, H), rShoulder = lm(12, W, H);
+  const lElbow    = lm(13, W, H), rElbow    = lm(14, W, H);
+  const lWrist    = lm(15, W, H), rWrist    = lm(16, W, H);
+  const lHip      = lm(23, W, H), rHip      = lm(24, W, H);
+  const lKnee     = lm(25, W, H), rKnee     = lm(26, W, H);
+  const lAnkle    = lm(27, W, H), rAnkle    = lm(28, W, H);
+
+  const minVis = 0.4;
+  const armsVisible = [lShoulder, lWrist, rShoulder, rWrist].every(p => p.v > minVis);
+  const legsVisible = [lHip, lAnkle, rHip, rAnkle].every(p => p.v > minVis);
+
+  // ── Arm geometry ─────────────────────────────────────────────────────
+  let armDev = null, vpPt = null, vpDist = null;
+  let leftArmAngle = null, rightArmAngle = null;
+
+  if (armsVisible) {
+    leftArmAngle  = lineAngle(lShoulder, lWrist);
+    rightArmAngle = lineAngle(rShoulder, rWrist);
+    armDev        = Math.abs(leftArmAngle - rightArmAngle);
+    if (armDev > 180) armDev = 360 - armDev;
+
+    // Vanishing point: intersection of extended arm lines
+    const leftLine  = lineThrough(lShoulder, lWrist);
+    const rightLine = lineThrough(rShoulder, rWrist);
+    vpPt = intersect(leftLine, rightLine);
+    if (vpPt) {
+      vpDist = normalizedDist(vpPt, W, H);
+      // Cap at 10 for display (very large = near parallel)
+      vpDist = Math.min(vpDist, 10);
+    }
+  }
+
+  // ── Leg geometry ─────────────────────────────────────────────────────
+  let leftLegAngle = null, rightLegAngle = null;
+  let legPt = null;
+  if (legsVisible) {
+    leftLegAngle  = lineAngle(lHip, lAnkle);
+    rightLegAngle = lineAngle(rHip, rAnkle);
+    // Leg-leg intersection
+    const leftLegLine  = lineThrough(lHip, lAnkle);
+    const rightLegLine = lineThrough(rHip, rAnkle);
+    legPt = intersect(leftLegLine, rightLegLine);
+  }
+  // Arm-leg cross intersections (left arm × left leg, right arm × right leg)
+  if (armsVisible && legsVisible) {
+    const leftArmLine  = lineThrough(lShoulder, lWrist);
+    const rightArmLine = lineThrough(rShoulder, rWrist);
+    const leftLegLine2  = lineThrough(lHip, lAnkle);
+    const rightLegLine2 = lineThrough(rHip, rAnkle);
+    // cross computed in trail push section below
+  }
+
+  // ── Update history ────────────────────────────────────────────────────
+  const t = video.currentTime;
+  const h = state.history;
+  if (h.times.length >= state.maxHistory) {
+    h.armDev.shift(); h.legAngle.shift(); h.vpDist.shift(); h.times.shift();
+  }
+  // Compute CR(t) of four body lines
+  const crVal = state.landmarks ? computeBodyCR(state.landmarks,
+    overlay.width, overlay.height) : null;
+  h.armDev.push(armDev !== null ? armDev : null);
+  h.legAngle.push(leftLegAngle !== null ? leftLegAngle : null);
+  h.vpDist.push(vpDist !== null ? vpDist : null);
+  h.crTime.push(crVal);
+  h.times.push(t);
+
+  // Update CR live readout
+  const crEl = document.getElementById('crCurrent');
+  if (crEl) {
+    if (crVal !== null && isFinite(crVal)) {
+      const harm = isHarmonic(crVal);
+      crEl.textContent = crVal.toFixed(3);
+      crEl.style.color = harm ? 'rgba(160,120,210,1)' : 'rgba(160,120,210,.5)';
+      crEl.style.fontWeight = harm ? 'bold' : 'normal';
+    } else {
+      crEl.textContent = '—';
+    }
+  }
+
+    // Trails updated by updateTrails() — called from onPoseResults
+
+
+  // ── Detect projective events ──────────────────────────────────────────
+  const isParallel = armDev !== null && armDev < state.threshold;
+  const isNear     = armDev !== null && armDev < state.threshold * 2;
+
+  if (isParallel && t - state.lastEventTime > 0.5) {
+    state.lastEventTime = t;
+    logEvent(t, `arms parallel (${armDev.toFixed(1)}°)`, 'parallel');
+  } else if (isNear && !isParallel && t - state.lastEventTime > 1.0) {
+    state.lastEventTime = t;
+    logEvent(t, `approaching parallel (${armDev ? armDev.toFixed(1) : '?'}°)`, 'near');
+  }
+
+  // ── Draw overlay ──────────────────────────────────────────────────────
+
+  // Draw video frame to canvas (this is our only render of the video)
+  // ── Draw intersection trails ──────────────────────────────────────────
+  // Compute current CoM for body-relative trail rendering
+  const _comPts = [lShoulder, rShoulder, lHip, rHip].filter(p => p.v > 0.3);
+  const com = _comPts.length > 0
+    ? { x: _comPts.reduce((s,p)=>s+p.x,0)/_comPts.length,
+        y: _comPts.reduce((s,p)=>s+p.y,0)/_comPts.length }
+    : { x: W/2, y: H/2 };
+
+  // Draw a trail in the dancer's reference frame.
+  function drawTrail(arr, r, g, b, show, bodyRelative=true) {
+    if (!show || arr.length < 2) return;
+    const sl = state.lineScale;
+    const toScreen = (p) => bodyRelative
+      ? { x: com.x + p.dx, y: com.y + p.dy }
+      : { x: p.comX + p.dx, y: p.comY + p.dy };
+
+    for (let i = 1; i < arr.length; i++) {
+      const p0 = toScreen(arr[i-1]), p1 = toScreen(arr[i]);
+      // Skip large jumps (scrub or lost tracking)
+      if (Math.hypot(p1.x-p0.x, p1.y-p0.y) > overlay.width * 0.6) continue;
+      const alpha = 0.15 + (i / arr.length) * 0.7;
+      const lw = 4 * sl, ow = 3 * sl;
+      ctx.save();
+      ctx.strokeStyle = `rgba(6,8,14,0.7)`;
+      ctx.lineWidth = lw + ow;
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y);
+      ctx.stroke();
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Current endpoint dot
+    const last = toScreen(arr[arr.length - 1]);
+    const dr = 7 * sl;
+    ctx.fillStyle = 'rgba(6,8,14,0.8)';
+    ctx.beginPath(); ctx.arc(last.x, last.y, dr+3*sl, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = `rgba(${r},${g},${b},0.95)`;
+    ctx.beginPath(); ctx.arc(last.x, last.y, dr, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Arm-arm VP trail: amber — absolute screen coords (shows movement toward ∞)
+  drawTrail(state.vpTrail,    232, 201, 122, state.showVPTrail,    false);
+  // Leg-leg intersection: blue — body-relative (stays near dancer)
+  drawTrail(state.legTrail,   110, 168, 200, state.showLegTrail,   true);
+  // Arm×leg cross: rose — body-relative (stays near dancer)
+  drawTrail(state.crossTrail, 200, 120, 138, state.showCrossTrail, true);
+
+  // Horizon line (line at infinity marker) when near-parallel
+  if (state.showHorizon && armDev !== null && armDev < state.threshold * 3) {
+    const alpha = Math.max(0, 1 - armDev / (state.threshold * 3));
+    ctx.strokeStyle = `rgba(232,201,122,${alpha * 0.9})`;
+    ctx.lineWidth = 4 * state.lineScale;
+    ctx.setLineDash([6, 8]);
+    // Estimate horizon as average of arm y-midpoints
+    const horizY = (lShoulder.y + lWrist.y + rShoulder.y + rWrist.y) / 4;
+    ctx.beginPath();
+    ctx.moveTo(0, horizY);
+    ctx.lineTo(W, horizY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Line at infinity label
+    ctx.fillStyle = `rgba(232,201,122,${alpha * 0.6})`;
+    ctx.font = 'italic 10px EB Garamond, serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('line at ∞', W - 8, horizY - 4);
+  }
+
+  // Extended arm lines
+  if (state.showArmLines && armsVisible) {
+    const parallelAlpha = isParallel ? 0.9 : 0.6;
+    const parallelColor = isParallel
+      ? `rgba(232,201,122,${parallelAlpha})`
+      : `rgba(220,185,100,${parallelAlpha + 0.2})`;
+
+    // Left arm line extended — with dark outline
+    const lExt = extendLine(lShoulder, lWrist, W, H);
+    const rExt = extendLine(rShoulder, rWrist, W, H);
+    const armW = (isParallel ? 7 : 5);
+    ctx.setLineDash([8, 6]);
+    strokeWithOutline(ctx, c => {
+      c.beginPath(); c.moveTo(lExt.x1, lExt.y1); c.lineTo(lExt.x2, lExt.y2);
+    }, parallelColor, armW, 4);
+    strokeWithOutline(ctx, c => {
+      c.beginPath(); c.moveTo(rExt.x1, rExt.y1); c.lineTo(rExt.x2, rExt.y2);
+    }, parallelColor, armW, 4);
+    ctx.setLineDash([]);
+  }
+
+  // Extended leg lines
+  if (state.showLegLines && legsVisible) {
+    const lLegExt = extendLine(lHip, lAnkle, W, H, 3);
+    const rLegExt = extendLine(rHip, rAnkle, W, H, 3);
+    ctx.setLineDash([6, 7]);
+    strokeWithOutline(ctx, c => {
+      c.beginPath(); c.moveTo(lLegExt.x1, lLegExt.y1); c.lineTo(lLegExt.x2, lLegExt.y2);
+    }, 'rgba(20,80,160,0.95)', 5, 4);
+    strokeWithOutline(ctx, c => {
+      c.beginPath(); c.moveTo(rLegExt.x1, rLegExt.y1); c.lineTo(rLegExt.x2, rLegExt.y2);
+    }, 'rgba(20,80,160,0.95)', 5, 4);
+    ctx.setLineDash([]);
+  }
+
+  // Skeleton
+  if (state.showSkeleton) {
+    const connections = [
+      [11,13],[13,15],   // left arm
+      [12,14],[14,16],   // right arm
+      [11,12],           // shoulders
+      [23,24],           // hips
+      [11,23],[12,24],   // torso sides
+      [23,25],[25,27],   // left leg
+      [24,26],[26,28],   // right leg
+    ];
+    connections.forEach(([i, j]) => {
+      const a = lm(i, W, H), b = lm(j, W, H);
+      if (a.v < minVis || b.v < minVis) return;
+      strokeWithOutline(ctx, c => {
+        c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y);
+      }, 'rgba(140,95,15,0.9)', 5, 3);
+    });
+
+    // Joint dots
+    [11,12,13,14,15,16,23,24,25,26,27,28].forEach(i => {
+      const p = lm(i, W, H);
+      if (p.v < minVis) return;
+      ctx.fillStyle = i < 17
+        ? 'rgba(140,95,15,0.8)'
+        : 'rgba(20,80,160,0.8)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 8 * state.lineScale, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // Vanishing point
+  if (state.showVP && vpPt && armsVisible) {
+    const inFrame = vpPt.x > -W && vpPt.x < 2*W && vpPt.y > -H && vpPt.y < 2*H;
+    if (inFrame) {
+      // Glow
+      const vpGlowR = 65 * state.lineScale;
+      const grd = ctx.createRadialGradient(vpPt.x, vpPt.y, 0, vpPt.x, vpPt.y, vpGlowR);
+      grd.addColorStop(0,   `rgba(232,201,122,${isParallel ? 0.7 : 0.4})`);
+      grd.addColorStop(0.4, `rgba(232,201,122,${isParallel ? 0.2 : 0.1})`);
+      grd.addColorStop(1,   'rgba(176,140,10,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(vpPt.x, vpPt.y, 65, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dot
+      ctx.fillStyle = isParallel
+        ? 'rgba(176,140,10,1)'
+        : 'rgba(140,95,15,0.85)';
+      ctx.beginPath();
+      ctx.arc(vpPt.x, vpPt.y, (isParallel ? 16 : 12) * state.lineScale, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label
+      ctx.fillStyle = 'rgba(176,140,10,0.8)';
+      ctx.font = 'italic 10px Cormorant Garamond, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('VP', vpPt.x, vpPt.y - 10);
+    } else {
+      // VP is off-frame — draw arrow toward it from centre
+      const cx2 = W/2, cy2 = H/2;
+      const dx = vpPt.x - cx2, dy = vpPt.y - cy2;
+      const dist2 = Math.sqrt(dx*dx + dy*dy);
+      const ux = dx/dist2, uy = dy/dist2;
+      // Arrow from centre toward VP direction, stopping near edge
+      const edgeDist = Math.min(W, H) * 0.42;
+      ctx.strokeStyle = 'rgba(176,140,10,0.6)';
+      ctx.fillStyle   = 'rgba(176,140,10,0.6)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx2, cy2);
+      ctx.lineTo(cx2 + ux*edgeDist, cy2 + uy*edgeDist);
+      ctx.stroke();
+      ctx.font = 'italic 10px Cormorant Garamond, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('VP →∞', cx2 + ux*(edgeDist+12), cy2 + uy*(edgeDist+12));
+    }
+  }
+
+  // ── CoM marker (shows reference frame origin) ───────────────────────────
+  if (state.showSkeleton) {
+    const sl = state.lineScale;
+    ctx.strokeStyle = 'rgba(140,95,15,0.3)';
+    ctx.lineWidth = 1 * sl;
+    const cr = 6 * sl;
+    ctx.beginPath();
+    ctx.moveTo(com.x - cr, com.y); ctx.lineTo(com.x + cr, com.y);
+    ctx.moveTo(com.x, com.y - cr); ctx.lineTo(com.x, com.y + cr);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(com.x, com.y, cr * 0.6, 0, Math.PI*2);
+    ctx.stroke();
+  }
+
+  // Parallel flash overlay
+  if (isParallel) {
+    ctx.fillStyle = 'rgba(176,140,10,0.06)';
+    ctx.fillRect(0, 0, W, H);
+    // Corner markers
+    const sz = 18;
+    ctx.strokeStyle = 'rgba(176,140,10,0.5)';
+    ctx.lineWidth = 1;
+    [[0,0],[W,0],[0,H],[W,H]].forEach(([cx3,cy3]) => {
+      const sx = cx3 === 0 ? 1 : -1, sy = cy3 === 0 ? 1 : -1;
+      ctx.beginPath();
+      ctx.moveTo(cx3 + sx*sz, cy3); ctx.lineTo(cx3, cy3); ctx.lineTo(cx3, cy3 + sy*sz);
+      ctx.stroke();
+    });
+  }
+
+  // ── Update UI ─────────────────────────────────────────────────────────
+  updateHUD(armDev, vpDist, leftArmAngle, rightArmAngle, leftLegAngle, rightLegAngle, isParallel);
+  renderCharts();
+}
+
+// ── HUD update ────────────────────────────────────────────────────────────
+function updateHUD(armDev, vpDist, la, ra, ll, rl, isParallel) {
+  const fmt = v => v !== null ? v.toFixed(1) : '—';
+
+  document.getElementById('statLA').innerHTML = `${fmt(la)}<span class="stat-unit">°</span>`;
+  document.getElementById('statRA').innerHTML = `${fmt(ra)}<span class="stat-unit">°</span>`;
+  document.getElementById('statDev').innerHTML = `${fmt(armDev)}<span class="stat-unit">°</span>`;
+  document.getElementById('statLL').innerHTML = `${fmt(ll)}<span class="stat-unit">°</span>`;
+  document.getElementById('statRL').innerHTML = `${fmt(rl)}<span class="stat-unit">°</span>`;
+
+  const vpStr = vpDist !== null
+    ? (vpDist >= 9.9 ? '→ ∞' : vpDist.toFixed(2))
+    : '—';
+  document.getElementById('statVP').textContent = vpStr;
+
+  // Projective state indicator
+  const eq     = document.getElementById('vpEq');
+  const status = document.getElementById('vpStatus');
+  const fill   = document.getElementById('vpFill');
+
+  if (armDev === null) {
+    eq.textContent = 'arms ∦';
+    eq.className   = 'vp-eq';
+    status.textContent = 'arms not detected';
+    status.className   = 'vp-status';
+    fill.style.width   = '0%';
+  } else {
+    const parallelFrac = Math.max(0, 1 - armDev / state.threshold);
+    if (isParallel) {
+      eq.textContent   = 'arms ∥  →  VP at ∞';
+      eq.className     = 'vp-eq projective';
+      status.textContent = `projective configuration · deviation ${armDev.toFixed(1)}°`;
+      status.className   = 'vp-status projective';
+    } else {
+      eq.textContent   = `arms ∦  (${armDev.toFixed(1)}°)`;
+      eq.className     = 'vp-eq';
+      status.textContent = `VP at distance ${vpStr} from centre`;
+      status.className   = 'vp-status';
+    }
+    fill.style.width = Math.round(parallelFrac * 100) + '%';
+  }
+
+  document.getElementById('armVal').textContent = armDev !== null ? armDev.toFixed(1)+'°' : '—';
+  document.getElementById('legVal').textContent = ll   !== null ? ll.toFixed(1)+'°'  : '—';
+  document.getElementById('vpVal').textContent  = vpDist !== null ? (vpDist >= 9.9 ? '∞' : vpDist.toFixed(2)) : '—';
+}
+
+// ── Time-series chart renderer ─────────────────────────────────────────────
+// ── Specialized CR(t) chart ───────────────────────────────────────────────
+// Shows CR on y-axis, clamps to [-4, 4] for display,
+// draws dashed harmonic lines at CR=-1, 2, 0.5
+function renderCRChart(canvas, ctx2, data) {
+  const W2 = canvas.width, H2 = canvas.height;
+  ctx2.clearRect(0, 0, W2, H2);
+  if (!W2 || !H2) return;
+
+  const MIN_CR = -3, MAX_CR = 3;
+  const CR_RANGE = MAX_CR - MIN_CR;
+
+  function crToY(cr) {
+    const clamped = Math.max(MIN_CR, Math.min(MAX_CR, cr));
+    return H2 - ((clamped - MIN_CR) / CR_RANGE) * H2;
+  }
+
+  // Grid lines at 0
+  ctx2.strokeStyle = '#d0c8b8'; ctx2.lineWidth = 0.5;
+  ctx2.beginPath();
+  ctx2.moveTo(0, crToY(0)); ctx2.lineTo(W2, crToY(0));
+  ctx2.stroke();
+
+  // Harmonic reference lines: CR = -1, 2, 0.5
+  [[-1,'rgba(160,120,210,.45)'],[2,'rgba(160,120,210,.3)'],[0.5,'rgba(160,120,210,.3)']].forEach(([v,col])=>{
+    if (v < MIN_CR || v > MAX_CR) return;
+    const y = crToY(v);
+    ctx2.save();
+    ctx2.strokeStyle = col; ctx2.lineWidth = 1;
+    ctx2.setLineDash([4, 5]);
+    ctx2.beginPath(); ctx2.moveTo(0, y); ctx2.lineTo(W2, y); ctx2.stroke();
+    ctx2.setLineDash([]);
+    // Label
+    ctx2.fillStyle = col; ctx2.font = '8px sans-serif';
+    ctx2.textAlign = 'right'; ctx2.textBaseline = 'bottom';
+    ctx2.fillText(v === -1 ? '-1' : String(v), W2-2, y-1);
+    ctx2.restore();
+  });
+
+  // Plot CR(t) curve
+  const valid = data.filter(v => v !== null && isFinite(v));
+  if (valid.length < 2) return;
+
+  ctx2.strokeStyle = 'rgba(160,120,210,0.85)';
+  ctx2.lineWidth = 1.4;
+  ctx2.beginPath();
+  let started = false;
+  data.forEach((v, i) => {
+    if (v === null || !isFinite(v) || Math.abs(v) > 20) { started = false; return; }
+    const x = (i / data.length) * W2;
+    const y = crToY(v);
+    if (!started) { ctx2.moveTo(x, y); started = true; }
+    else ctx2.lineTo(x, y);
+  });
+  ctx2.stroke();
+
+  // Highlight harmonic regions (where |CR+1|<0.15 or |CR-2|<0.15 etc)
+  ctx2.fillStyle = 'rgba(110,60,175,.12)';
+  data.forEach((v, i) => {
+    if (v === null || !isHarmonic(v, 0.15)) return;
+    const x = (i / data.length) * W2;
+    const dx = W2 / data.length;
+    ctx2.fillRect(x, 0, dx+1, H2);
+  });
+}
+
+function renderChart(canvas, actx2, data, color, maxVal, zeroCentered) {
+  const W2 = canvas.width, H2 = canvas.height;
+  actx2.clearRect(0, 0, W2, H2);
+
+  // Baseline
+  actx2.strokeStyle = '#d0c8b8';
+  actx2.lineWidth = 0.5;
+  actx2.beginPath();
+  actx2.moveTo(0, H2/2); actx2.lineTo(W2, H2/2);
+  actx2.stroke();
+
+  const vals = data.filter(v => v !== null);
+  if (vals.length < 2) return;
+
+  actx2.strokeStyle = color;
+  actx2.lineWidth = 1.2;
+  actx2.beginPath();
+
+  let started = false;
+  data.forEach((v, i) => {
+    if (v === null) { started = false; return; }
+    const x = (i / data.length) * W2;
+    const norm = zeroCentered
+      ? 0.5 - (v / maxVal) * 0.45
+      : 1 - (v / maxVal) * 0.9;
+    const y = Math.max(2, Math.min(H2-2, norm * H2));
+    if (!started) { actx2.moveTo(x, y); started = true; }
+    else actx2.lineTo(x, y);
+  });
+  actx2.stroke();
+
+  // Threshold line for arm chart
+  if (zeroCentered === false && maxVal === 90) {
+    const ty = (1 - (state.threshold / maxVal) * 0.9) * H2;
+    actx2.strokeStyle = 'rgba(176,140,10,0.3)';
+    actx2.lineWidth = 0.7;
+    actx2.setLineDash([3,4]);
+    actx2.beginPath();
+    actx2.moveTo(0, ty); actx2.lineTo(W2, ty);
+    actx2.stroke();
+    actx2.setLineDash([]);
+  }
+}
+
+function renderCharts() {
+  // Size charts to their containers
+  [armChartC, legChartC, vpChartC, crChartC].forEach(c => {
+    const wrap = c.parentElement;
+    c.width  = wrap.clientWidth - 12;
+    c.height = wrap.clientHeight - 30;
+  });
+
+  const h = state.history;
+  renderChart(armChartC, actx, h.armDev,   'rgba(140,95,15,0.8)', 90,  false);
+  renderChart(legChartC, lctx, h.legAngle, 'rgba(20,80,160,0.8)', 90,  true);
+  renderChart(vpChartC,  vctx, h.vpDist,   'rgba(176,140,10,0.8)', 10,  false);
+  renderCRChart(crChartC, cctx, h.crTime);
+}
+
+// ── Event log ─────────────────────────────────────────────────────────────
+function logEvent(t, desc, type) {
+  const mins = Math.floor(t / 60);
+  const secs = (t % 60).toFixed(1).padStart(4, '0');
+  const timeStr = `${mins}:${secs}`;
+
+  const entry = document.createElement('div');
+  entry.className = `event-entry ${type}`;
+  entry.innerHTML = `<span class="event-time">${timeStr}</span><span class="event-desc">${desc}</span>`;
+
+  // Remove placeholder note if present
+  const note = eventLog.querySelector('.note');
+  if (note) note.remove();
+
+  eventLog.insertBefore(entry, eventLog.firstChild);
+  state.events.push({ t, desc, type });
+
+  // Keep log tidy
+  while (eventLog.children.length > 30) {
+    eventLog.removeChild(eventLog.lastChild);
+  }
+}
+
+// ── Video loading ─────────────────────────────────────────────────────────
+function dbg(msg) {
+  console.log(msg);
+  const panel = document.getElementById('debugPanel');
+  const lines = document.getElementById('debugLines');
+  panel.style.display = 'block';
+  const line = document.createElement('div');
+  line.textContent = new Date().toISOString().slice(11,23) + '  ' + msg;
+  lines.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+  // Auto-hide 2 seconds after "Ready" — job done
+  if (msg.includes('Ready ✓')) {
+    setTimeout(() => { panel.style.display = 'none'; }, 2000);
+  }
+}
+
+function loadVideo(file) {
+  if (!file) { dbg('loadVideo called with null file'); return; }
+  dbg('File received: "' + file.name + '"  type:"' + file.type + '"  size:' + file.size + ' bytes');
+
+  loadingEl.style.display = 'flex';
+  loadingEl.innerHTML = '<div>Reading <em>' + file.name + '</em>…</div>';
+  dropZone.style.display = 'none';
+
+  // Read as ArrayBuffer first to confirm the file is actually readable
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    dbg('FileReader loaded ' + e.target.result.byteLength + ' bytes OK');
+
+    // Now create object URL and hand to video element
+    const blob = new Blob([e.target.result], {
+      type: file.type || (file.name.toLowerCase().endsWith('.mov') ? 'video/quicktime' : 'video/mp4')
+    });
+    const url = URL.createObjectURL(blob);
+    dbg('Object URL created: ' + url.slice(0, 60));
+
+    video.removeAttribute('src');
+    video.innerHTML = '';
+
+    // Try multiple source elements for codec compatibility
+    const types = [
+      file.type,
+      'video/mp4; codecs="avc1.42E01E, mp4a.40.2"',
+      'video/mp4',
+      'video/quicktime',
+      'video/webm',
+      ''
+    ].filter((t, i, arr) => t !== undefined && arr.indexOf(t) === i);
+
+    types.forEach(t => {
+      const s = document.createElement('source');
+      s.src  = url;
+      if (t) s.type = t;
+      video.appendChild(s);
+    });
+
+    video.src = url;
+
+    dbg('Calling video.load()…');
+    video.load();
+
+    const onMeta = () => {
+      dbg('loadedmetadata: ' + video.videoWidth + 'x' + video.videoHeight + ' dur=' + video.duration.toFixed(2) + 's');
+      const W = video.videoWidth  || 640;
+      const H = video.videoHeight || 480;
+      overlay.width  = W;
+      overlay.height = H;
+      state.videoW = W;
+      state.videoH = H;
+      vidControls.style.display = 'flex';
+      chartsRow.style.display   = 'flex';
+      scrubber.max  = video.duration;
+      scrubber.step = 0.033;
+      loadingEl.style.display = 'none';
+      state.loaded = true;
+
+      // Scale canvas display to fit container (critical for portrait 1080x1920)
+      const wrap = document.getElementById('videoWrap');
+      const maxW = wrap.clientWidth  - 8;
+      const maxH = wrap.clientHeight - 8;
+      const aspect = W / H;
+      let dispW = maxW, dispH = maxW / aspect;
+      if (dispH > maxH) { dispH = maxH; dispW = maxH * aspect; }
+      overlay.style.width  = Math.round(dispW) + 'px';
+      overlay.style.height = Math.round(dispH) + 'px';
+      dbg('Display: ' + Math.round(dispW) + 'x' + Math.round(dispH) + (H > W ? ' (portrait)' : ' (landscape)'));
+
+      // Draw first frame immediately
+      processFrame();
+      dbg('Ready ✓');
+    };
+
+    const onErr = () => {
+      const err = video.error;
+      const codes = {1:'ABORTED',2:'NETWORK_ERR',3:'DECODE_ERR',4:'FORMAT_NOT_SUPPORTED'};
+      const msg = err ? (codes[err.code] || 'code '+err.code) + (err.message ? ': '+err.message : '') : 'unknown';
+      dbg('VIDEO ERROR: ' + msg);
+      loadingEl.innerHTML =
+        '<div style="color:#c87a8a;text-align:center;padding:1rem;line-height:1.8">' +
+        '<strong>Video error: ' + msg + '</strong><br><br>' +
+        (msg.includes('FORMAT') || msg.includes('SUPPORTED') ?
+          '<strong style="color:#e8c97a">The Claude viewer cannot decode video.</strong><br>' +
+          'Save this HTML file to your computer and open it<br>' +
+          'directly in <strong>Chrome</strong> or <strong>Safari</strong>.<br>' +
+          'Your video file is perfectly fine.' :
+          'Check the debug log for details.') + '<br><br>' +
+        '<span id="retryBtn" style="cursor:pointer;color:#c8a96e;border-bottom:1px solid #c8a96e;">Try another file</span>' +
+        '</div>';
+      const rb = document.getElementById('retryBtn');
+      if (rb) rb.addEventListener('click', () => {
+        loadingEl.style.display = 'none';
+        dropZone.style.display  = 'flex';
+      });
+    };
+
+    const onStalled = () => dbg('stalled event fired');
+    const onWaiting = () => dbg('waiting event fired');
+    const onCanPlay = () => dbg('canplay event fired — codec accepted');
+    const onLoadStart = () => dbg('loadstart event fired');
+
+    video.addEventListener('loadedmetadata', onMeta,    { once: true });
+    video.addEventListener('error',          onErr,     { once: true });
+    video.addEventListener('stalled',        onStalled, { once: true });
+    video.addEventListener('waiting',        onWaiting, { once: true });
+    video.addEventListener('canplay',        onCanPlay, { once: true });
+    video.addEventListener('loadstart',      onLoadStart,{ once: true });
+
+    // 8-second timeout
+    setTimeout(() => {
+      if (!state.loaded) {
+        dbg('TIMEOUT after 8s — video never became ready');
+        loadingEl.innerHTML =
+          '<div style="color:#e8c97a;text-align:center;padding:1rem;line-height:1.8">' +
+          'Timed out loading video.<br>' +
+          'Check the debug log at the bottom of the video area.<br><br>' +
+          'Most reliable fix: in <strong>QuickTime Player</strong>,<br>' +
+          'File → Export As → <strong>1080p</strong> → saves as .mp4<br><br>' +
+          '<span id="retryBtn3" style="cursor:pointer;color:#c8a96e;border-bottom:1px solid #c8a96e;">Try another file</span>' +
+          '</div>';
+        const rb = document.getElementById('retryBtn3');
+        if (rb) rb.addEventListener('click', () => {
+          loadingEl.style.display = 'none';
+          dropZone.style.display  = 'flex';
+        });
+      }
+    }, 8000);
+  };
+
+  reader.onerror = function(e) {
+    dbg('FileReader ERROR: ' + e.target.error);
+    loadingEl.innerHTML = '<div style="color:#c87a8a">Could not read file. Check permissions.</div>';
+  };
+
+  reader.onprogress = function(e) {
+    if (e.lengthComputable) {
+      const pct = Math.round(e.loaded / e.total * 100);
+      if (pct % 25 === 0) dbg('Reading: ' + pct + '%');
+      loadingEl.innerHTML = '<div>Reading file… ' + pct + '%</div>';
+    }
+  };
+
+  dbg('Starting FileReader.readAsArrayBuffer…');
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Frame processing ─────────────────────────────────────────────────────
+let processingFrame = false;
+
+async function processFrame() {
+  if (!state.loaded) return;
+  if (processingFrame) return;
+  processingFrame = true;
+  try {
+    await pose.send({ image: video });
+  } catch(e) {
+    dbg('Pose error: ' + e.message);
+  } finally {
+    processingFrame = false;
+  }
+  if (video.duration) {
+    scrubber.value = video.currentTime;
+    timeDisplay.textContent = fmtTime(video.currentTime) + ' / ' + fmtTime(video.duration);
+  }
+}
+
+// Animation loop — runs every frame, processes when video is playing
+// ── Render loop: draw every animation frame from current state ──────────
+// This runs at ~60fps. Pose detection runs async at ~15fps.
+// Between pose frames, we redraw using the last known landmarks + stored trails.
+function renderFrame() {
+  if (!state.loaded) { requestAnimationFrame(renderFrame); return; }
+
+  const W = overlay.width, H = overlay.height;
+
+  // 1. Draw video frame
+  ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  ctx.globalAlpha = 0.88;
+  ctx.drawImage(video, 0, 0, W, H);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(245,240,232,0.18)';
+  ctx.fillRect(0, 0, W, H);
+
+  // 2. Draw geometry overlay from current state (landmarks + trails)
+  if (state.landmarks) drawOverlay();
+
+  // 3. Kick off pose detection (throttled — skips if already processing)
+  if (!video.paused && !video.ended) processFrame();
+
+  requestAnimationFrame(renderFrame);
+}
+requestAnimationFrame(renderFrame);
+
+// Also process on seek (scrubbing while paused)
+video.addEventListener('seeked', () => { if (state.loaded) processFrame(); });
+
+// ── Controls wiring ───────────────────────────────────────────────────────
+document.getElementById('explicitBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  dbg('Explicit button clicked — opening file picker');
+  fileInput.click();
+});
+
+dropZone.addEventListener('click', () => {
+  dbg('Drop zone clicked — opening file picker');
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0];
+  dbg('fileInput change event: ' + (file ? file.name : 'no file'));
+  if (file) loadVideo(file);
+  fileInput.value = '';
+});
+
+
+
+document.getElementById('videoWrap').addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.style.background = 'rgba(140,95,15,0.04)';
+});
+document.getElementById('videoWrap').addEventListener('dragleave', () => {
+  dropZone.style.background = '';
+});
+document.getElementById('videoWrap').addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.style.background = '';
+  if (e.dataTransfer.files[0]) loadVideo(e.dataTransfer.files[0]);
+});
+
+playBtn.addEventListener('click', () => {
+  if (video.paused) { video.play(); playBtn.textContent = 'Pause'; }
+  else              { video.pause(); playBtn.textContent = 'Play'; }
+});
+
+video.addEventListener('ended', () => { playBtn.textContent = 'Play'; });
+
+scrubber.addEventListener('input', () => {
+  video.currentTime = scrubber.value;
+  state.vpTrail = []; state.legTrail = []; state.crossTrail = [];
+
+  state.history.armDev = [];
+  state.history.legAngle = [];
+  state.history.vpDist = [];
+  state.history.crTime = [];
+  state.history.times = [];
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  video.currentTime = 0;
+  video.pause();
+  playBtn.textContent = 'Play';
+  state.vpTrail = []; state.legTrail = []; state.crossTrail = [];
+  state.history.armDev = [];
+  state.history.legAngle = [];
+  state.history.vpDist = [];
+  state.history.crTime = [];
+  state.history.times = [];
+  state.events = [];
+  eventLog.innerHTML = '<div class="note">Events will appear here…</div>';
+});
+
+document.getElementById('threshSlider').addEventListener('input', e => {
+  state.threshold = +e.target.value;
+  document.getElementById('threshVal').textContent = state.threshold + '°';
+});
+
+document.getElementById('scaleSlider').addEventListener('input', e => {
+  state.lineScale = +e.target.value;
+  document.getElementById('scaleVal').textContent = state.lineScale.toFixed(1) + '×';
+});
+
+['showSkeleton','showArmLines','showLegLines','showVP','showHorizon','showVPTrail','showLegTrail','showCrossTrail'].forEach(id => {
+  document.getElementById(id).addEventListener('change', e => {
+    state[id] = e.target.checked;
+  });
+});
+</script>
+</body>
+</html>
