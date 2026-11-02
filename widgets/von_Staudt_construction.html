@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>von Staudt — CR(W,Y ; X,Z) = 2</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:    #F5F0E8;
+    --panel: #EAE4D4;
+    --border:#C8B87A;
+    --gold:  #7A5010;
+    --body:  #2C2820;
+    --muted: #7A7060;
+    --blue:  #1A5090;
+    --teal:  #106048;
+    --coral: #8A3018;
+    --purp:  #5030A0;
+    --red:   #8A2020;
+    --gray:  #5A5248;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:var(--bg); color:var(--body);
+    font-family:'EB Garamond',Georgia,serif;
+    min-height:100vh;
+    display:flex; flex-direction:column;
+    align-items:center;
+    padding:1.2rem 1rem 2rem;
+  }
+  header {
+    width:100%; max-width:989px;
+    border-bottom:2px solid var(--border);
+    padding-bottom:.6rem; margin-bottom:.9rem;
+  }
+  header h1 {
+    font-size:1.55rem; font-weight:600; color:var(--gold);
+  }
+  header p {
+    font-size:1.01rem; color:var(--muted); font-style:italic; margin-top:.15rem;
+  }
+  .main { width:100%; max-width:989px; }
+
+  canvas {
+    display:block; width:100%;
+    border-radius:6px;
+    background:var(--bg);
+    border:1.5px solid var(--border);
+    cursor:crosshair;
+  }
+
+  /* ── Ratio display ───────────────────────────────────────────── */
+  .ratio-box {
+    display:none; margin-top:.65rem;
+    border:1.5px solid var(--border); border-radius:8px;
+    overflow:hidden; font-size:.88rem;
+  }
+  .ratio-box.vis { display:flex; }
+  .ratio-cell {
+    flex:1; padding:.55rem .8rem;
+    background:var(--panel);
+  }
+  .ratio-cell + .ratio-cell { border-left:1px solid var(--border); }
+  .ratio-eq {
+    display:flex; align-items:center;
+    padding:.55rem .45rem;
+    font-size:1.05rem; color:var(--muted);
+    background:var(--bg);
+  }
+  .ratio-result {
+    padding:.55rem .85rem;
+    background:#EDE8FC;
+    border-left:1px solid var(--border);
+    display:flex; flex-direction:column; justify-content:center;
+  }
+  .rlbl { font-size:0.83rem; color:var(--muted); font-style:italic; margin-bottom:.15rem; }
+  .ratio-result .rlbl { color:#6030A0; }
+  .rval { font-weight:600; font-size:1.26rem; color:var(--body); }
+  .ratio-result .rval { font-size:1.44rem; color:#4020A0; }
+  /* Fraction display */
+  .frac-wrap { display:flex; align-items:center; gap:.4rem;
+    font-weight:600; font-size:1.61rem; color:var(--body); padding:.2rem 0; }
+  .frac { display:inline-flex; flex-direction:column;
+    align-items:center; line-height:1.2; }
+  .frac .num { border-bottom:2px solid currentColor; padding:0 .18rem .05rem; }
+  .frac .den { padding:.05rem .18rem 0; }
+  .frac-eq { font-size:1.61rem; font-weight:600; }
+  .frac-num-val { font-size:1.61rem; font-weight:600; }
+  /* Large divide sign */
+  .ratio-eq-big { display:flex; align-items:center; justify-content:center;
+    font-size:3.22rem; font-weight:400; color:var(--muted);
+    padding:0 .2rem; line-height:1; }
+
+  /* ── Legend ──────────────────────────────────────────────────── */
+  .legend {
+    display:flex; flex-wrap:wrap; gap:.35rem;
+    margin:.65rem 0 .45rem;
+  }
+  .pill {
+    display:inline-flex; align-items:center;
+    padding:.2rem .65rem; border-radius:20px;
+    font-size:.78rem; font-weight:600; letter-spacing:.01em;
+  }
+
+  /* ── Step buttons ────────────────────────────────────────────── */
+  .step-row {
+    display:flex; flex-wrap:wrap; gap:.35rem;
+    margin:.35rem 0 .55rem;
+  }
+  .stp {
+    font-size:.78rem; font-family:'EB Garamond',Georgia,serif;
+    padding:.25rem .75rem; border-radius:20px;
+    border:1px solid var(--border);
+    background:var(--panel); color:var(--muted);
+    cursor:pointer; transition:background .12s;
+  }
+  .stp:hover { background:#DDD8C4; }
+  .stp.on { color:#fff; }
+
+  /* Preset buttons */
+  .preset-row {
+    display:flex; gap:.35rem; flex-wrap:wrap; margin-bottom:.1rem;
+  }
+  .pre {
+    font-family:'EB Garamond',Georgia,serif;
+    font-size:.8rem; padding:.22rem .65rem; border-radius:20px;
+    border:1px solid var(--border);
+    background:var(--panel); color:var(--muted);
+    cursor:pointer; transition:background .12s,border-color .12s;
+  }
+  .pre:hover { background:#DDD8C4; border-color:var(--gold); }
+  .pre.act   { background:var(--gold); color:#fff; border-color:var(--gold); }
+  .preset-note {
+    font-size:.74rem; color:#106048; font-style:italic;
+    min-height:1.1rem; line-height:1.45;
+  }
+
+  .hint {
+    font-size:.82rem; color:var(--muted);
+    font-style:italic; line-height:1.55;
+    min-height:1.6rem;
+  }
+
+  footer {
+    margin-top:1.4rem;
+    font-size:0.86rem; color:var(--muted); font-style:italic;
+    text-align:center; width:100%; max-width:989px;
+    border-top:1px solid var(--border); padding-top:.6rem;
+  }
+</style>
+</head>
+<body>
+
+<header style="padding:.3rem 1rem .25rem;">
+  <h1 id="mainTitle">von Staudt’s Construction &nbsp;<span style="font-size:.7em;color:var(--muted);font-weight:400;font-style:italic;">W, X, Y, Z</span></h1>
+</header>
+
+<div class="main">
+  <canvas id="cv" height="414"></canvas>
+
+  <div class="ratio-box" id="ratioBox">
+    <div class="ratio-cell click" id="rcABCB" onclick="toggleSeg('AB')" title="Click to highlight WX and YX on the diagram">
+      <div class="frac-wrap"><div class="frac"><span class="num">WX</span><span class="den">YX</span></div><span class="frac-eq">=</span><span class="frac-num-val" id="rACBC">—</span></div>
+    </div>
+    <div class="ratio-eq-big">&divide;</div>
+    <div class="ratio-cell click cd" id="rcCDAD" onclick="toggleSeg('CD')" title="Click to highlight WZ and YZ on the diagram">
+      <div class="frac-wrap"><div class="frac"><span class="num">WZ</span><span class="den">YZ</span></div><span class="frac-eq">=</span><span class="frac-num-val" id="rADBD">—</span></div>
+    </div>
+    <div class="ratio-eq">=</div>
+    <div class="ratio-result">
+      <div class="rval" id="rCR" style="font-size:2.3rem;">—</div>
+    </div>
+  </div>
+
+  <div class="ratio-box" id="ratioBox2" style="display:none;margin-top:.4rem;">
+    <div class="ratio-cell click" id="rcABprime" onclick="toggleSeg2('AB')" title="Click to highlight W′X′ and Y′X′ on transversal">
+      <div class="frac-wrap"><div class="frac"><span class="num">W′X′</span><span class="den">Y′X′</span></div><span class="frac-eq">=</span><span class="frac-num-val" id="rABprime">—</span></div>
+    </div>
+    <div class="ratio-eq-big">&divide;</div>
+    <div class="ratio-cell click cd" id="rcADprime" onclick="toggleSeg2('CD')" title="Click to highlight W′Z′ and Y′Z′ on transversal">
+      <div class="frac-wrap"><div class="frac"><span class="num">W′Z′</span><span class="den">Y′Z′</span></div><span class="frac-eq">=</span><span class="frac-num-val" id="rADprime">—</span></div>
+    </div>
+    <div class="ratio-eq">=</div>
+    <div class="ratio-result">
+      <div class="rval" id="rCR2" style="font-size:2.3rem;">—</div>
+    </div>
+  </div>
+
+<div style="font-size:.7rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-top:.5rem;margin-bottom:.2rem;">Construction steps</div>
+  <div class="step-row" id="steps"></div>
+  <div style="margin:.3rem 0 .1rem;display:flex;gap:.4rem;flex-wrap:wrap;">
+  <button id="btnFreeD" style="display:none;font-family:'EB Garamond',Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #8A2020;background:#FDEEED;color:#8A2020;font-weight:600;">Release Z</button>
+  <button id="btnMusic" style="display:none;font-family:'EB Garamond',Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #7A5010;background:#F5ECD8;color:#7A5010;font-weight:600;">♪ Frequencies</button>
+  <button id="btnMusic2" style="display:none;font-family:'EB Garamond',Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #5030A0;background:#EEEDFE;color:#5030A0;font-weight:600;">♪ Lengths</button>
+  <button id="btnMid" style="display:none;font-family:'EB Garamond',Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #0A6E86;background:#E2F2F6;color:#07505F;font-weight:600;">Y at midpoint</button>
+  <button id="btnInt" style="display:none;font-family:'EB Garamond',Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #7A3060;background:#F6E9F0;color:#5E2449;font-weight:600;">0, 1, 2 …</button>
+  <button id="btnTrans" style="display:none;font-family:'EB Garamond',Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #106048;background:#E4F0EB;color:#0A4030;font-weight:600;">Transversal</button>
+  <button id="btnOpaque" style="display:none;font-family:'EB Garamond',Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #5A5248;background:#EDEAE2;color:#3A352C;font-weight:600;">Opaque</button>
+  <button id="btnNoBase" style="display:none;font-family:'EB Garamond',Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #1F6F52;background:#E4F3EC;color:#14553E;font-weight:600;">No baseline</button>
+  <button id="btnClean" style="display:none;font-family:'EB Garamond',Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #5030A0;background:#EEEDFE;color:#4020A0;font-weight:600;">✨ Clean view (pencil only)</button></div>
+</div>
+<div style="display:none;margin:.3rem 0 0;" id="transSliderWrap">
+  <div style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;margin-top:.3rem;">
+    <label style="color:var(--muted);min-width:90px;">Angle</label>
+    <input type="range" id="slTransAng" min="-80" max="80" value="15" step="1"
+      style="flex:1;accent-color:#106048;cursor:pointer;height:4px;">
+    <span style="min-width:36px;text-align:right;font-size:.8rem;" id="vTransAng">15°</span>
+  </div>
+</div>
+<div class="hint" id="hint"></div>
+</div>
+
+<footer style="display:none;"></footer>
+
+<script>
+const cv  = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const DPR = window.devicePixelRatio || 1;
+
+const C = {
+  BLUE:'#1A5090', TEAL:'#106048', CORAL:'#8A3018',
+  PURP:'#5030A0', GOLD:'#7A5010', GRAY:'#5A5248', RED:'#8A2020',
+  BG:  '#F5F0E8', PANEL:'#EAE4D4',
+};
+
+const STEPS = [
+  { label:'1. Baseline W X Y',    col:'#5A5248' },
+  { label:'2. Eye point O',       col:'#106048' },
+  { label:'3. Lines OW OX OY',   col:'#106048' },
+  { label:'4. Node P on OY',     col:'#8A3018' },
+  { label:'5. Lines WP→R, XP→S', col:'#8A3018' },
+  { label:'6. Line RS → Z',       col:'#5030A0' },
+  { label:'7. Drag O and P',      col:'#7A5010' },
+  { label:'8. O as eye — pencil', col:'#8A3018' },
+];
+let showUpTo = 0;
+let cleanView = false;
+let freeD = false;  // true = D released from construction
+let musicPreset  = false;  // true = freq preset (Tonic/Fourth/Fifth/Octave)
+let musicPreset2 = false;
+let midPreset   = false;  // Y placed at midpoint of W,X
+let intPreset   = false;  // relabel W,Y,X as 0,1,2  // true = length preset (Octave/Fifth/Fourth/Tonic)
+let showTrans = false;  // toggled by Transversal button
+let opaqueBelow = false;  // shade region below transversal
+let noBaseline  = false;  // hide baseline + W,Y,X,Z
+let segHL  = null;  // 'AB' | 'CD' | null  (baseline)
+let segHL2 = null;  // 'AB' | 'CD' | null  (transversal)
+let primePts = null;  // {iA,iB,iC,iD,tU} — set each draw when transversal shown
+
+// ── Sizing ────────────────────────────────────────────────────────
+const S = 1.15;  // global magnification for projection
+function resize() {
+  const w = cv.parentElement.clientWidth;
+  const hCss = 414;
+  cv.width  = w * DPR;
+  cv.height = hCss * DPR;
+  cv.style.width  = w + 'px';
+  cv.style.height = hCss + 'px';
+  // Scale the whole drawing: coordinates, line widths and fonts all grow by S
+  ctx.setTransform(DPR * S, 0, 0, DPR * S, 0, 0);
+  draw();
+}
+const W = () => cv.width  / (DPR * S);
+const H = () => cv.height / (DPR * S);
+
+// ── State ─────────────────────────────────────────────────────────
+const state = { A:{x:0,y:0}, B:{x:0,y:0}, C:{x:0,y:0}, O:{x:0,y:0}, P:{x:0,y:0}, T:{x:0,y:0} };
+let transCutPos = 0.38;  // vertical position of transversal (fraction of H)
+let transAng    = 15;    // angle of transversal in degrees
+
+function initPts() {
+  const w = W(), h = H();
+  const bY = h * 0.73;
+  const lo = w * 0.12, hi = w * 0.50;
+  const sc = x => lo + (x - 1) / (3/2 - 1) * (hi - lo);
+  // Open with frequency preset: A=Tonic, C=Fourth, B=Fifth, D=Octave (von Staudt)
+  state.A = { x: sc(1),   y: bY };   // Tonic  at 12%
+  state.C = { x: sc(4/3), y: bY };   // Fourth at 37%
+  state.B = { x: sc(3/2), y: bY };   // Fifth  at 50%
+  state.O = { x: w*0.30,  y: h*0.18 };
+  musicPreset = true;
+  qFrac = 0.42;
+  state.P = {
+    x: state.O.x + qFrac * (state.C.x - state.O.x),
+    y: state.O.y + qFrac * (state.C.y - state.O.y)
+  };
+  state.T = { x: w*0.50, y: h*0.38 };  // transversal anchor
+}
+
+// ── Geometry ──────────────────────────────────────────────────────
+function dir(a, b)  { return { x: b.x-a.x, y: b.y-a.y }; }
+
+function intersect(p1, d1, p2, d2) {
+  const dx = p2.x-p1.x, dy = p2.y-p1.y;
+  const cross = d1.x*d2.y - d1.y*d2.x;
+  if (Math.abs(cross) < 1e-10) return null;
+  const t = (dx*d2.y - dy*d2.x) / cross;
+  return { x: p1.x + t*d1.x, y: p1.y + t*d1.y };
+}
+
+function compute() {
+  const { A, B, C, O, P } = state;
+  const R = intersect(A, dir(A,P), O, dir(O,B));
+  const S = intersect(B, dir(B,P), O, dir(O,A));
+  const D = (R && S) ? intersect(A, {x:1,y:0}, R, dir(R,S)) : null;
+  return { R, S, D };
+}
+
+// ── Draw helpers ──────────────────────────────────────────────────
+// Line through O parallel to the baseline — this is the line O∞,
+// the fourth member of the pencil when Z has gone to infinity.
+function drawParallelThroughO(O, baselinePt, col, lw, alpha) {
+  const w = W(), h = H();
+  const ext = Math.max(w, h) * 3;
+  ctx.save();
+  ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.moveTo(O.x - ext, O.y);
+  ctx.lineTo(O.x + ext, O.y);
+  ctx.stroke();
+  ctx.restore();
+  lbl('O∞', O.x + w * 0.16, O.y - 8, col, 20, true);
+}
+
+function drawFullLine(a, b, col, lw, dash, alpha) {
+  const d = dir(a, b), len = Math.hypot(d.x, d.y);
+  if (len < 1e-6) return;
+  const ux = d.x/len, uy = d.y/len, ext = 3000;
+  ctx.save();
+  ctx.globalAlpha  = alpha ?? 1;
+  ctx.strokeStyle  = col;
+  ctx.lineWidth    = lw ?? 1;
+  ctx.setLineDash(dash ?? []);
+  ctx.beginPath();
+  ctx.moveTo(a.x - ux*ext, a.y - uy*ext);
+  ctx.lineTo(a.x + ux*ext, a.y + uy*ext);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function dot(p, col, r) {
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r ?? 5, 0, Math.PI*2);
+  ctx.fillStyle   = col;
+  ctx.strokeStyle = C.BG;
+  ctx.lineWidth   = 1.8;
+  ctx.fill();
+  ctx.stroke();
+}
+
+function lbl(txt, x, y, col, sz, bold) {
+  ctx.font      = (bold ? 'bold ' : '') + ((sz??13)+'px') + " 'EB Garamond',Georgia,serif";
+  ctx.fillStyle = col;
+  ctx.fillText(txt, x, y);
+}
+
+// ── Main draw ─────────────────────────────────────────────────────
+function draw() {
+  const w = W(), h = H();
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = C.BG;
+  ctx.fillRect(0, 0, w, h);
+
+  const { A, B, C: Cp, O, P } = state;
+  const computed = compute();
+  const { R, S } = computed;
+  const D = freeD ? state.D : computed.D;
+  // When freeD activated, snap state.D to computed position first
+  const u = showUpTo;
+
+  // Step 1 — baseline + W X Y  (hidden entirely when noBaseline)
+  if (u >= 0 && !noBaseline) {
+    drawFullLine(A, B, C.GRAY, 1.4, [], 0.4);
+    dot(A, C.BLUE, 6); lbl(intPreset?'0':'W', A.x-26, A.y-13, C.BLUE, 23, true);
+    dot(B, C.BLUE, 6); lbl(intPreset?'2':'X', B.x+10, B.y-13, C.BLUE, 23, true);
+    dot(Cp,C.GRAY, 6); lbl(intPreset?'1':'Y', Cp.x+10,Cp.y-13,C.GRAY, 23, true);
+    if (musicPreset) {
+      lbl('Tonic',  A.x-28,  A.y+28,  C.BLUE, 22, true);
+      lbl('262 Hz', A.x-28,  A.y+48,  C.BLUE, 18, true);
+      lbl('Fifth',  B.x+10,  B.y+28,  C.BLUE, 22, true);
+      lbl('392 Hz', B.x+10,  B.y+48,  C.BLUE, 18, true);
+      lbl('Fourth', Cp.x-32, Cp.y+28, C.GRAY, 22, true);
+      lbl('349 Hz', Cp.x-28, Cp.y+48, C.GRAY, 18, true);
+    }
+    if (musicPreset2) {
+      lbl('Octave', A.x-32,  A.y+28,  C.BLUE, 22, true);
+      lbl('1/2',    A.x-20,  A.y+48,  C.BLUE, 20, true);
+      lbl('Fourth', B.x+10,  B.y+28,  C.BLUE, 22, true);
+      lbl('3/4',    B.x+16,  B.y+48,  C.BLUE, 20, true);
+      lbl('Fifth',  Cp.x-28, Cp.y+28, C.GRAY, 22, true);
+      lbl('2/3',    Cp.x-18, Cp.y+48, C.GRAY, 20, true);
+    }
+  }
+
+  // Step 2 — apex P
+  if (u >= 1) {
+    dot(O, C.TEAL, 7);
+    lbl('O', O.x+11, O.y-8, C.TEAL, 23, true);
+  }
+
+  // Step 3 — lines OA OB OC
+  if (u >= 2 && !cleanView) {
+    drawFullLine(O, A,  C.TEAL, 2.2, [], 0.72);
+    drawFullLine(O, B,  C.TEAL, 2.2, [], 0.72);
+    drawFullLine(O, Cp, C.TEAL, 2.2, [], 0.72);
+
+  }
+
+  // Step 4 — node P (construction)
+  if (u >= 3 && !cleanView) {
+    dot(P, C.CORAL, 6);
+    lbl('P', P.x+11, P.y-6, C.CORAL, 23, true);
+  }
+
+  // Step 5 — lines AP→R, BP→S (construction)
+  if (u >= 4 && R && S && !cleanView) {
+    drawFullLine(A, P, C.CORAL, 1.2, [6,4], 0.55);
+    drawFullLine(B, P, C.CORAL, 1.2, [6,4], 0.55);
+    dot(R, C.RED, 5); lbl('R', R.x+9,  R.y-6, C.RED, 23, true);
+    dot(S, C.RED, 5); lbl('S', S.x+9,  S.y-6, C.RED, 23, true);
+  }
+
+  // Step 6 — line RS → D
+  if (u >= 5 && R && S && D) {
+    if (!cleanView) drawFullLine(R, S, C.PURP, 1.8, [6,4], 0.75);
+    if (!noBaseline) {
+      dot(D, C.PURP, 8);
+      lbl('Z', D.x+12, D.y-13, C.PURP, 25, true);
+    }
+    if (musicPreset)  { lbl('Octave', D.x+12, D.y+28, C.PURP, 22, true); lbl('523 Hz', D.x+12, D.y+48, C.PURP, 18, true); }
+    if (musicPreset2) { lbl('Tonic', D.x+12, D.y+28, C.PURP, 22, true); lbl('1', D.x+18, D.y+48, C.PURP, 20, true); }
+  }
+
+  // Step 7 — drag nudge
+  if (u >= 6 && D && !cleanView) {
+    // (drag hint removed for presentation)
+  }
+
+  // ── Segment highlights on baseline ───────────────────────────────────
+  if (segHL && showUpTo >= 5) {
+    // A, B, Cp, D are already in scope from top of draw()
+    if (D) {
+      const barH = 11;
+      const segBar = (p1x, p2x, col, label, side) => {
+        const lo = Math.min(p1x, p2x), hi = Math.max(p1x, p2x);
+        const bY = A.y;  // all base points share same y
+        const s = side < 0 ? -1 : 1;
+        const barTop = s < 0 ? bY - barH*2 : bY;
+        const barBot = s < 0 ? bY           : bY + barH*2;
+        const lineY  = s < 0 ? bY - barH*2 + 2 : bY + barH*2 - 2;
+        const labelY = s < 0 ? bY - barH*2 - 5  : bY + barH*2 + 13;
+        ctx.save();
+        ctx.fillStyle = col; ctx.globalAlpha = 0.15;
+        ctx.fillRect(lo, barTop, hi-lo, barBot-barTop);
+        ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(lo, barTop); ctx.lineTo(lo, barBot);
+        ctx.moveTo(hi, barTop); ctx.lineTo(hi, barBot);
+        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(lo, lineY); ctx.lineTo(hi, lineY); ctx.stroke();
+        ctx.font = "bold 10px 'EB Garamond',Georgia,serif";
+        ctx.fillStyle = col; ctx.textAlign = 'center';
+        ctx.fillText(label, (lo+hi)/2, labelY);
+        ctx.textAlign = 'left'; ctx.restore();
+      }
+
+      if (segHL === 'AB') {
+        segBar(A.x, B.x, '#185FA5', 'WX', -1);   // WX above
+        segBar(Cp.x, B.x, '#993C1D', 'YX', +1);  // YX below
+      } else if (segHL === 'CD') {
+        segBar(A.x, D.x, '#106048', 'WZ', -1);   // WZ above
+        segBar(Cp.x, D.x, '#5030A0', 'YZ', +1);  // YZ below
+      }
+    }
+  }
+
+  // Tick marks + distance labels when D is visible
+  if (u >= 5 && D && isFinite(D.x) && !noBaseline) {
+    const y0 = A.y;
+    [[A,C.BLUE],[B,C.BLUE],[Cp,C.GRAY],[D,C.PURP]].forEach(([p,col]) => {
+      ctx.beginPath();
+      ctx.moveTo(p.x, y0+3); ctx.lineTo(p.x, y0+11);
+      ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+      ctx.setLineDash([]); ctx.stroke();
+    });
+
+  }
+
+  // ── Clean view pencil (active from step 5+ when cleanView is on) ─
+  if (cleanView && showUpTo >= 5) {
+    const cvPts = [
+      { pt: A,  col: C.BLUE  },
+      { pt: Cp, col: C.GRAY  },
+      { pt: B,  col: C.BLUE  },
+    ];
+    if (D) cvPts.push({ pt: D, col: C.PURP });
+    cvPts.forEach(({ pt, col }) => {
+      drawFullLine(O, pt, col, 1.8, [], 0.72);
+    });
+    if (!D) drawParallelThroughO(O, A, C.PURP, 1.8, 0.72);
+  }
+
+  // ── Step 8: pencil at O + draggable transversal ───────────────
+  if (showUpTo < 7 || !showTrans) primePts = null;
+  if (showUpTo >= 7) {
+    const { T } = state;
+    const u8col = '#7A3060';   // plum for pencil lines
+    const tcol  = '#106048';   // teal for transversal
+
+    // Four pencil lines through P: to A, C, B, D (if D exists)
+    const pencilPts = [
+      { pt: A,  col: C.BLUE,  name: 'A' },
+      { pt: Cp, col: C.GRAY,  name: 'C' },
+      { pt: B,  col: C.BLUE,  name: 'B' },
+    ];
+    if (D) pencilPts.push({ pt: D, col: C.PURP, name: 'D' });
+    if (!D) drawParallelThroughO(O, A, C.PURP, cleanView ? 2.7 : 2.1, 0.72);
+
+    pencilPts.forEach(({ pt, col, name }) => {
+      if (cleanView) {
+        drawFullLine(O, pt, col, 2.7, [], 0.72);  // solid in clean view
+      } else {
+        drawFullLine(O, pt, col, 2.1, [], 0.70);
+      }
+    });
+
+    // Transversal — only when showTrans is toggled on
+    if (showTrans) {
+    // Transversal: horizontal-ish line that can be dragged vertically and rotated
+    const tY  = transCutPos * h;
+    const tDx = Math.cos(transAng * Math.PI/180);
+    const tDy = -Math.sin(transAng * Math.PI/180);
+    const tAnchor = { x: w/2, y: tY };
+    const tDir    = { x: tDx, y: tDy };
+
+    const tExt = Math.max(w,h)*3;
+
+    // Shade the half-plane below the transversal
+    if (opaqueBelow) {
+      // Outward normal pointing to the "below" side (canvas y increases downward)
+      const nx = tDy, ny = -tDx;
+      const sgn = (ny >= 0) ? 1 : -1;
+      const ox = nx * sgn * tExt, oy = ny * sgn * tExt;
+      const ax = tAnchor.x - tDx*tExt, ay = tAnchor.y - tDy*tExt;
+      const bx = tAnchor.x + tDx*tExt, by = tAnchor.y + tDy*tExt;
+      ctx.save();
+      ctx.globalAlpha = 0.70;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.lineTo(bx + ox, by + oy);
+      ctx.lineTo(ax + ox, ay + oy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Draw the transversal line
+    ctx.save();
+    ctx.strokeStyle = tcol; ctx.lineWidth = 2; ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.moveTo(tAnchor.x - tDx*tExt, tAnchor.y - tDy*tExt);
+    ctx.lineTo(tAnchor.x + tDx*tExt, tAnchor.y + tDy*tExt);
+    ctx.stroke(); ctx.restore();
+
+    // T is now just the anchor for intersections — not dragged as a point
+    const T = tAnchor;
+
+    // Intersections of transversal with pencil lines
+    function intersectLines(p1, d1, p2, d2) {
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const cross = d1.x * d2.y - d1.y * d2.x;
+      if (Math.abs(cross) < 1e-8) return null;
+      const t = (dx * d2.y - dy * d2.x) / cross;
+      return { x: p1.x + t * d1.x, y: p1.y + t * d1.y };
+    }
+
+    const tLen = Math.hypot(tDir.x, tDir.y);
+    const tU   = { x: tDir.x / tLen, y: tDir.y / tLen };
+
+    function transectPencilLine(anchor) {
+      const dP = { x: anchor.x - O.x, y: anchor.y - O.y };
+      return intersectLines(T, tDir, O, dP);
+    }
+
+    const iA = transectPencilLine(A);
+    const iC = transectPencilLine(Cp);
+    const iB = transectPencilLine(B);
+    const iD = D ? transectPencilLine(D) : null;
+    // Store for ratio display and highlighting
+    primePts = (iA && iB && iC && iD) ? { iA, iB, iC, iD, tU } : null;
+
+    // Draw intersection dots
+    [[iA,C.BLUE,"W\u2032"],[iC,C.GRAY,"Y\u2032"],[iB,C.BLUE,"X\u2032"]]
+      .concat(iD ? [[iD,C.PURP,"Z\u2032"]] : [])
+      .forEach(([pt, col, name]) => {
+        if (!pt) return;
+        dot(pt, col, 5);
+        lbl(name, pt.x + 8, pt.y - 10, col, 23, true);
+      });
+
+    // ── Transversal segment highlights ─────────────────────────────
+    if (segHL2 && primePts) {
+      const { iA: pA, iB: pB, iC: pC, iD: pD, tU: tu } = primePts;
+      const barW = 10;
+      const nx = -tu.y, ny = tu.x;  // perpendicular to transversal
+      function segBarT(p1, p2, col, label, side) {
+        if (!p1 || !p2) return;
+        const s = side < 0 ? -1 : 1;
+        const off = s * barW * 2;
+        ctx.save();
+        ctx.fillStyle = col; ctx.globalAlpha = 0.18;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.lineTo(p2.x + nx*off, p2.y + ny*off);
+        ctx.lineTo(p1.x + nx*off, p1.y + ny*off);
+        ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.setLineDash([]);
+        [[p1.x,p1.y],[p2.x,p2.y]].forEach(([px,py]) => {
+          ctx.beginPath();
+          ctx.moveTo(px - nx*barW, py - ny*barW);
+          ctx.lineTo(px + nx*(off+barW), py + ny*(off+barW));
+          ctx.stroke();
+        });
+        ctx.beginPath();
+        ctx.moveTo(p1.x + nx*off, p1.y + ny*off);
+        ctx.lineTo(p2.x + nx*off, p2.y + ny*off);
+        ctx.stroke();
+        ctx.font = "bold 11px 'EB Garamond',Georgia,serif";
+        ctx.fillStyle = col; ctx.textAlign = 'center';
+        const mx = (p1.x+p2.x)/2 + nx*(off+barW+6);
+        const my = (p1.y+p2.y)/2 + ny*(off+barW+6);
+        ctx.fillText(label, mx, my);
+        ctx.textAlign = 'left'; ctx.restore();
+      }
+      if (segHL2 === 'AB') {
+        segBarT(pA, pB, '#185FA5', "W′X′", -1);
+        segBarT(pC, pB, '#993C1D', "Y′X′", +1);
+      } else if (segHL2 === 'CD') {
+        segBarT(pA, pD, '#106048', "W′Z′", -1);
+        segBarT(pC, pD, '#5030A0', "Y′Z′", +1);
+      }
+    }
+
+    } // end showTrans block
+
+    // Label at top
+    if (!cleanView) {
+      // (step-8 canvas text removed)
+    } else {
+      // (clean view text removed)
+    }
+  }
+
+  updateRatios(D);
+  updateRatios2();
+}
+
+// ── Ratio display ─────────────────────────────────────────────────
+function updateRatios(D) {
+  const box = document.getElementById('ratioBox');
+  if (!D || showUpTo < 5) { box.classList.remove('vis'); return; }
+  box.classList.add('vis');
+  const { A, B, C: Cp } = state;
+  // CR(W,Y;X,Z) = (WX/YX) × (WZ/YZ)  — all signed x-distances
+  const AB = B.x - A.x,  CB = B.x - Cp.x;
+  const AD = D.x - A.x,  CD = D.x - Cp.x;
+  if (Math.abs(CB) < 1 || Math.abs(CD) < 1) {
+    ['rACBC','rADBD','rCR'].forEach(id => document.getElementById(id).textContent = '—');
+    return;
+  }
+  const r1 = AB / CB;          // WX/YX
+  const r2 = AD / CD;          // WZ/YZ  (flipped for ÷)
+  const cr_val = r1 / r2;      // (WX/YX) ÷ (WZ/YZ)
+  document.getElementById('rACBC').textContent = r1.toFixed(3);
+  document.getElementById('rADBD').textContent = r2.toFixed(3);
+  const el = document.getElementById('rCR');
+  const isHarm = Math.abs(cr_val - 2) < 0.08;
+  el.textContent = isHarm ? '2' : cr_val.toFixed(3);
+  el.style.color = isHarm ? '#4020A0' : '#8A2020';
+  el.style.fontSize = freeD && !isHarm ? '1.6rem' : '2rem';
+}
+
+// ── Transversal ratio display ────────────────────────────────────────
+function updateRatios2() {
+  const box2 = document.getElementById('ratioBox2');
+  if (!primePts || !showTrans || showUpTo < 7) {
+    box2.style.display = 'none';
+    segHL2 = null;
+    document.getElementById('rcABprime')?.classList.remove('active');
+    document.getElementById('rcADprime')?.classList.remove('active');
+    return;
+  }
+  box2.style.display = 'flex';
+  const { iA, iB, iC, iD, tU } = primePts;
+  function proj(pt) { return pt.x * tU.x + pt.y * tU.y; }
+  const pA = proj(iA), pB = proj(iB), pC = proj(iC), pD = proj(iD);
+  const AB2 = pB - pA, CB2 = pB - pC, AD2 = pD - pA, CD2 = pD - pC;
+  if (Math.abs(CB2) < 0.5 || Math.abs(CD2) < 0.5) return;
+  const r1 = AB2 / CB2;
+  const r2 = AD2 / CD2;
+  const crv = r1 / r2;
+  document.getElementById('rABprime').textContent = r1.toFixed(3);
+  document.getElementById('rADprime').textContent = r2.toFixed(3);
+  const el = document.getElementById('rCR2');
+  el.textContent = Math.abs(crv - 2) < 0.08 ? '2' : crv.toFixed(3);
+  el.style.color = Math.abs(crv - 2) < 0.08 ? '#4020A0' : '#8A2020';
+}
+
+// ── Constraints ───────────────────────────────────────────────────
+// qFrac: Q's position as a fraction along PC (0=P, 1=C). Persists across moves.
+let qFrac = 0.40;
+
+function constrainQ() {
+  const { O, C: Cp } = state;
+  const d = dir(O, Cp), len = Math.hypot(d.x, d.y);
+  if (len < 1e-6) return;
+  const ux = d.x/len, uy = d.y/len;
+  if (drag === 'P') {
+    // Q is being dragged — update the stored fraction from Q's current pixel position
+    const t = (state.P.x-O.x)*ux + (state.P.y-O.y)*uy;
+    qFrac = Math.max(0.15, Math.min(0.85, t/len));
+  }
+  // Always recompute Q's pixel position from the stored fraction
+  state.P = { x: O.x + ux*len*qFrac, y: O.y + uy*len*qFrac };
+}
+
+function constrainC() {
+  const { A, B } = state;
+  const d = dir(A, B), len = Math.hypot(d.x, d.y);
+  if (len < 1e-6) return;
+  const ux = d.x/len, uy = d.y/len;
+  const t  = (state.C.x-A.x)*ux + (state.C.y-A.y)*uy;
+  const tc = Math.max(0.05, Math.min(0.95, t/len));
+  state.C  = { x: A.x + ux*len*tc, y: A.y + uy*len*tc };
+}
+
+// ── Drag ─────────────────────────────────────────────────────────
+function isDraggable(n) {
+  if (n==='A' || n==='B' || n==='C') return showUpTo >= 0;
+  if (n==='O') return showUpTo >= 1;
+  if (n==='P') return showUpTo >= 3;
+  if (n==='T') return false;  // T handled via cutPos drag
+  if (n==='D') return freeD && showUpTo >= 5;
+  return false;
+}
+
+function hitTest(px, py) {
+  for (const n of Object.keys(state)) {
+    if (!isDraggable(n)) continue;
+    if (Math.hypot(px-state[n].x, py-state[n].y) < 14) return n;
+  }
+  // Hit test transversal line (when shown)
+  if (showTrans && showUpTo >= 7) {
+    const tY = transCutPos * H();
+    const ang = transAng * Math.PI / 180;
+    const nx = Math.sin(ang), ny = Math.cos(ang);
+    const dist = Math.abs((px - W()/2)*nx + (py - tY)*ny);
+    if (dist < 12) return 'trans';
+  }
+  return null;
+}
+
+function evPt(e) {
+  const r = cv.getBoundingClientRect();
+  const s = e.touches ? e.touches[0] : e;
+  return { x: (s.clientX-r.left) / S, y: (s.clientY-r.top) / S };
+}
+
+let drag = null, dragOff = { x:0, y:0 };
+
+function handleDown(e) {
+  const p = evPt(e);
+  drag = hitTest(p.x, p.y);
+  if (drag) {
+    cv.style.cursor = 'grabbing';
+    if (drag !== 'trans') dragOff = { x: state[drag].x-p.x, y: state[drag].y-p.y };
+  }
+}
+function handleMove(e) {
+  const p = evPt(e);
+  if (!drag) {
+    cv.style.cursor = hitTest(p.x, p.y) ? 'grab' : 'crosshair';
+    return;
+  }
+  if (drag === 'trans') {
+    transCutPos = Math.max(0.05, Math.min(0.90, p.y / H()));
+  } else {
+    const newPt = { x: p.x+dragOff.x, y: p.y+dragOff.y };
+    if (drag === 'D') {
+      // Constrain D to baseline y
+      state.D = { x: newPt.x, y: state.A.y };
+    } else {
+      state[drag] = newPt;
+      if (['A','B','C'].includes(drag))         constrainC();
+      if (['P','O','A','B','C'].includes(drag)) constrainQ();
+    }
+  }
+  draw();
+}
+function handleUp() { drag=null; cv.style.cursor='crosshair'; }
+
+cv.addEventListener('mousedown',  handleDown);
+cv.addEventListener('mousemove',  handleMove);
+cv.addEventListener('mouseup',    handleUp);
+cv.addEventListener('mouseleave', handleUp);
+cv.addEventListener('touchstart', e => { e.preventDefault(); handleDown(e); }, { passive:false });
+cv.addEventListener('touchmove',  e => { e.preventDefault(); handleMove(e); }, { passive:false });
+cv.addEventListener('touchend',   handleUp);
+
+// ── UI ────────────────────────────────────────────────────────────
+function toggleSeg2(seg) {
+  segHL2 = (segHL2 === seg) ? null : seg;
+  document.getElementById('rcABprime')?.classList.toggle('active', segHL2 === 'AB');
+  document.getElementById('rcADprime')?.classList.toggle('active', segHL2 === 'CD');
+  draw();
+}
+
+function toggleSeg(seg) {
+  segHL = (segHL === seg) ? null : seg;
+  document.getElementById('rcABCB')?.classList.toggle('active', segHL === 'AB');
+  document.getElementById('rcCDAD')?.classList.toggle('active', segHL === 'CD');
+  draw();
+}
+
+function buildUI() {
+  const srow = document.getElementById('steps');
+  srow.innerHTML = '';
+
+  STEPS.forEach((s, i) => {
+    const el = document.createElement('button');
+    el.className   = 'stp' + (i <= showUpTo ? ' on' : '');
+    if (i <= showUpTo) el.style.background = s.col;
+    el.textContent = s.label;
+    el.onclick     = () => { showUpTo=i; buildUI(); draw(); };
+    srow.appendChild(el);
+  });
+
+  const hints = [
+    'Three collinear points W, X, Y. Drag W and X freely; Y slides along the baseline.',
+    'O is the eye point — place it anywhere off the baseline. Entirely arbitrary.',
+    'Three lines radiate from O through A, B, C — lines OW, OX, OY.',
+    'P slides anywhere along line OY. Also entirely arbitrary.',
+    'Line WP meets OX at R. Line XP meets OW at S. Both depend on where O and P are.',
+    '',
+    '',
+  ];
+  document.getElementById('hint').textContent = hints[showUpTo] ?? '';
+
+  // Show/hide clean view button
+  const btn = document.getElementById('btnClean');
+  if (showUpTo >= 5) {
+    btn.style.display = 'inline-block';
+    btn.textContent = cleanView ? '✨ Show construction' : '✨ Clean view (pencil only)';
+    btn.style.background = cleanView ? '#5030A0' : '#EEEDFE';
+    btn.style.color = cleanView ? 'white' : '#4020A0';
+  } else {
+    btn.style.display = 'none';
+    cleanView = false;
+  }
+  // Transversal button — show from step 8
+  const btnT = document.getElementById('btnTrans');
+  if (btnT) {
+    btnT.style.display = (showUpTo >= 7) ? 'inline-block' : 'none';
+    if (showUpTo < 7) { showTrans = false; }
+  }
+  const btnNB = document.getElementById('btnNoBase');
+  if (btnNB) {
+    const showNB = (showUpTo >= 5 && cleanView);
+    btnNB.style.display = showNB ? 'inline-block' : 'none';
+    if (!showNB) { noBaseline = false; }
+    btnNB.style.background = noBaseline ? '#1F6F52' : '#E4F3EC';
+    btnNB.style.color      = noBaseline ? 'white'   : '#14553E';
+    btnNB.textContent      = noBaseline ? 'No baseline ✓' : 'No baseline';
+  }
+  const btnOp = document.getElementById('btnOpaque');
+  if (btnOp) {
+    const showOp = (showUpTo >= 5 && cleanView);
+    btnOp.style.display = showOp ? 'inline-block' : 'none';
+    if (!showOp) { opaqueBelow = false; }
+    btnOp.style.background = opaqueBelow ? '#5A5248' : '#EDEAE2';
+    btnOp.style.color      = opaqueBelow ? 'white'   : '#3A352C';
+    btnOp.textContent      = opaqueBelow ? 'Opaque ✓' : 'Opaque';
+  }
+  // Release D button — show from step 6 (when D exists) and cleanView
+  const btnFD = document.getElementById('btnFreeD');
+  if (btnFD) {
+    btnFD.style.display = (showUpTo >= 5 && cleanView) ? 'inline-block' : 'none';
+    if (showUpTo < 5) { freeD = false; }
+    btnFD.textContent  = freeD ? 'Lock Z (von Staudt)' : 'Release Z';
+    btnFD.style.background = freeD ? '#8A2020' : '#FDEEED';
+    btnFD.style.color      = freeD ? 'white'   : '#8A2020';
+  }
+  // Music preset button — show in clean view when D is locked
+  const btnM = document.getElementById('btnMusic');
+  if (btnM) {
+    const showMusicBtns = showUpTo >= 5 && cleanView && !freeD;
+    if (freeD || showUpTo < 5) { musicPreset = false; musicPreset2 = false; midPreset = false; intPreset = false; }
+    // Frequency button
+    btnM.style.cssText = musicPreset
+      ? 'font-family:"EB Garamond",Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #7A5010;background:#7A5010;color:white;font-weight:600;display:'+(showMusicBtns?'inline-block':'none')+';'
+      : 'font-family:"EB Garamond",Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #7A5010;background:#F5ECD8;color:#7A5010;font-weight:600;display:'+(showMusicBtns?'inline-block':'none')+';';
+    // Integer-labels button (shares the midpoint geometry)
+    const btnInt = document.getElementById('btnInt');
+    if (btnInt) {
+      btnInt.style.cssText = intPreset
+        ? 'font-family:"EB Garamond",Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #7A3060;background:#7A3060;color:white;font-weight:600;display:'+(showMusicBtns?'inline-block':'none')+';'
+        : 'font-family:"EB Garamond",Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #7A3060;background:#F6E9F0;color:#5E2449;font-weight:600;display:'+(showMusicBtns?'inline-block':'none')+';';
+    }
+    // Midpoint button
+    const btnMid = document.getElementById('btnMid');
+    if (btnMid) {
+      btnMid.style.cssText = midPreset
+        ? 'font-family:"EB Garamond",Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #0A6E86;background:#0A6E86;color:white;font-weight:600;display:'+(showMusicBtns?'inline-block':'none')+';'
+        : 'font-family:"EB Garamond",Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #0A6E86;background:#E2F2F6;color:#07505F;font-weight:600;display:'+(showMusicBtns?'inline-block':'none')+';';
+    }
+    // Length button
+    const btnM2 = document.getElementById('btnMusic2');
+    if (btnM2) {
+      btnM2.style.cssText = musicPreset2
+        ? 'font-family:"EB Garamond",Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #5030A0;background:#5030A0;color:white;font-weight:600;display:'+(showMusicBtns?'inline-block':'none')+';'
+        : 'font-family:"EB Garamond",Georgia,serif;font-size:0.94rem;padding:0.32rem 0.92rem;border-radius:4px;cursor:pointer;border:1.5px solid #5030A0;background:#EEEDFE;color:#5030A0;font-weight:600;display:'+(showMusicBtns?'inline-block':'none')+';';
+    }
+  }
+
+  // Update title (context-dependent)
+  const titleEl = document.getElementById('mainTitle');
+  if (titleEl) {
+    if (freeD) {
+      titleEl.innerHTML = '<span style="color:#8A2020;font-weight:700;">NOT</span> von Staudt’s Construction';
+    } else if (intPreset) {
+      titleEl.innerHTML = '2 is the harmonic conjugate of 0 with respect to 1 and ∞';
+    } else if (midPreset) {
+      titleEl.innerHTML = '∞ is the harmonic conjugate of the midpoint Y with respect to W and X';
+    } else if (musicPreset) {
+      titleEl.innerHTML = 'The octave is the harmonic conjugate of the fourth with respect to the tonic and the fifth';
+    } else if (musicPreset2) {
+      titleEl.innerHTML = 'The tonic is the harmonic conjugate of the fifth with respect to the octave and the fourth';
+    } else if (cleanView) {
+      titleEl.innerHTML = 'Four lines through a point O are called a <em>pencil</em> of lines';
+    } else if (showUpTo === 6) {
+      titleEl.innerHTML = 'The point Z does <span style="color:#8A2020;font-weight:700;">NOT</span> depend on positions of O and P.';
+    } else if (showUpTo === 5) {
+      titleEl.innerHTML = 'Z is the <em>harmonic conjugate</em> of Y with respect to the pair W, X';
+    } else {
+      titleEl.textContent = 'von Staudt’s Construction';
+    }
+  }
+}
+
+// ── Clean view toggle ────────────────────────────────────────────
+document.getElementById('btnClean').addEventListener('click', () => {
+  cleanView = !cleanView;
+  buildUI();
+  draw();
+});
+document.getElementById('btnNoBase').addEventListener('click', () => {
+  noBaseline = !noBaseline;
+  buildUI();
+  draw();
+});
+
+document.getElementById('btnOpaque').addEventListener('click', () => {
+  opaqueBelow = !opaqueBelow;
+  buildUI();
+  draw();
+});
+
+document.getElementById('btnTrans').addEventListener('click', () => {
+  showTrans = !showTrans;
+  const btn = document.getElementById('btnTrans');
+  btn.style.background   = showTrans ? '#106048' : '#E4F0EB';
+  btn.style.color        = showTrans ? 'white'   : '#0A4030';
+  btn.textContent        = showTrans ? 'Transversal ✓' : 'Transversal';
+  document.getElementById('transSliderWrap').style.display = showTrans ? 'block' : 'none';
+  draw();
+});
+document.getElementById('btnMusic').addEventListener('click', () => {
+  musicPreset = !musicPreset;
+  if (musicPreset) { musicPreset2 = false; midPreset = false; intPreset = false; }
+  if (musicPreset) {
+    // A=Tonic(1), B=Fifth(3/2), C=Fourth(4/3), D=Octave(2) — constructed by von Staudt.
+    // Scale: string lengths 1..3/2 map to canvas 12%..50%, so octave(2) lands at 88%.
+    // Story: the Fourth and Octave are harmonic conjugates w.r.t. Tonic and Fifth.
+    const w = W(), h = H();
+    const bY = h * 0.73;
+    const lo = w * 0.12, hi = w * 0.50;  // tonic..fifth range
+    const sc = x => lo + (x - 1) / (3/2 - 1) * (hi - lo);
+    state.A = { x: sc(1),    y: bY };   // Tonic  at 12%
+    state.C = { x: sc(4/3),  y: bY };   // Fourth at 37%
+    state.B = { x: sc(3/2),  y: bY };   // Fifth  at 50%
+    // D=Octave will be constructed at sc(2) = 88% by von Staudt
+    // Place O off-centre (not at midpoint of AB) so construction works
+    state.O = { x: w * 0.30, y: h * 0.18 };
+    qFrac = 0.42;
+    constrainQ();
+    constrainC();
+    showUpTo = Math.max(showUpTo, 5);  // never step backwards
+  }
+  buildUI();
+  draw();
+});
+
+document.getElementById('btnInt').addEventListener('click', () => {
+  intPreset = !intPreset;
+  if (intPreset) {
+    musicPreset = false; musicPreset2 = false; midPreset = false;
+    // Same configuration as "Y at midpoint": Y is the midpoint of W and X,
+    // so Z is at infinity and {0,2 ; 1,∞} is harmonic.
+    state.C = { x: (state.A.x + state.B.x) / 2, y: state.A.y };
+    qFrac = 0.42;
+    constrainQ();
+    constrainC();
+    showUpTo = Math.max(showUpTo, 5);  // never step backwards
+  }
+  buildUI();
+  draw();
+});
+
+document.getElementById('btnMid').addEventListener('click', () => {
+  midPreset = !midPreset;
+  if (midPreset) {
+    musicPreset = false; musicPreset2 = false; intPreset = false;
+    // Put Y exactly at the midpoint of W and X (wherever they currently are)
+    state.C = { x: (state.A.x + state.B.x) / 2, y: state.A.y };
+    qFrac = 0.42;
+    constrainQ();
+    constrainC();
+    showUpTo = Math.max(showUpTo, 5);  // never step backwards
+  }
+  buildUI();
+  draw();
+});
+
+document.getElementById('btnMusic2').addEventListener('click', () => {
+  musicPreset2 = !musicPreset2;
+  if (musicPreset2) {
+    musicPreset = false; midPreset = false; intPreset = false;  // turn off the others
+    // A=Octave(1/2), C=Fifth(2/3), B=Fourth(3/4), D=Tonic(1) by construction
+    // Same canvas scale as freq preset: 1/2→12%, 3/4→50%, 1→88%
+    const w = W(), h = H();
+    const bY = h * 0.73;
+    const lo = w * 0.12, hi = w * 0.50;
+    // Map: 1/2→lo, 3/4→hi (so 2/3 lands at 37%, 1 lands at 88%)
+    const sc = x => lo + (x - 0.5) / (0.75 - 0.5) * (hi - lo);
+    state.A = { x: sc(0.5),     y: bY };  // Octave (1/2) at 12%
+    state.C = { x: sc(2/3),     y: bY };  // Fifth  (2/3) at 37%
+    state.B = { x: sc(3/4),     y: bY };  // Fourth (3/4) at 50%
+    // D=Tonic(1) will be constructed at sc(1) = 88%
+    state.O = { x: w * 0.30, y: h * 0.18 };
+    qFrac = 0.42;
+    constrainQ();
+    constrainC();
+    showUpTo = Math.max(showUpTo, 5);  // never step backwards
+  }
+  buildUI();
+  draw();
+});
+
+document.getElementById('btnFreeD').addEventListener('click', () => {
+  freeD = !freeD;
+  if (freeD) {
+    // Snap state.D to current computed position so drag starts from there
+    const comp = compute();
+    if (comp.D) state.D = { x: comp.D.x, y: comp.D.y };
+  }
+  buildUI();
+  draw();
+});
+
+document.getElementById('slTransAng').addEventListener('input', function() {
+  transAng = parseInt(this.value);
+  document.getElementById('vTransAng').textContent = transAng + '°';
+  draw();
+});
+
+// ── Keyboard ──────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key==='ArrowRight' || e.key===' ') {
+    if (showUpTo < STEPS.length-1) { showUpTo++; buildUI(); draw(); }
+  } else if (e.key==='ArrowLeft') {
+    if (showUpTo > 0) { showUpTo--; buildUI(); draw(); }
+  }
+});
+
+resize();
+initPts();
+buildUI();
+draw();
+// Mark first preset button active after init
+</script>
+</body>
+</html>
